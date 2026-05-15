@@ -14,5 +14,7 @@ models/*.pkl
 models/*.joblib
 models/*.lgb
 .pytest_cache/
+pytest-cache-files-*/
+notebooks/data/
 .coverage
 htmlcov/
