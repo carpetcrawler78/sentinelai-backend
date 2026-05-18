@@ -4,7 +4,7 @@ Read this file first. It is the single source of truth for any AI assistant
 working on this project. Update the "Current Status" and "Next Steps" sections
 at the end of each working session.
 
-Last updated: 2026-05-06 (LLM Backend Strategy + Demo Plan added)
+Last updated: 2026-05-18 (API module added, status updated, notebooks reorganised)
 
 ---
 
@@ -54,11 +54,35 @@ Hybrid search design:
 - Fusion: Weighted RRF k=60, w_bm25=0.4, w_vector=0.6
 - Query encoding: first sentence only (full narrative dilutes embeddings -- Bug #5)
 
-### Module 3 -- Signal Detection (NOT YET STARTED)
+### Module 3 -- Signal Detection (DONE: PRR/ROR, Grafana)
 PRR/ROR disproportionality over processed.coding_results
-Planned files:
-- src/vigilex/signals/prr_ror.py
-Dashboards: Grafana (primary), Streamlit (demo/portfolio)
+
+Key files:
+- src/vigilex/signals/prr_ror.py    -- COMPLETE, 8 pytest tests green
+- tests/test_prr_ror.py             -- 8 tests, all passing
+
+Dashboards:
+- Grafana: DONE (2026-05-12) -- sentinelai-coding-v1 dashboard, vigilex-postgres datasource
+- Streamlit: NOT YET STARTED (Plan B: may skip)
+
+### REST API -- DONE (2026-05-18)
+FastAPI service serving processed.coding_results as JSON.
+Entry point: src/vigilex/api/main.py (vigilex.api.main:app)
+Dockerfile: docker/Dockerfile.api (was already configured, module was missing)
+Auth: X-API-Key header (set API_KEY in .env)
+
+Endpoints:
+- GET /health                  -- liveness + DB check (no auth)
+- GET /coding-results          -- paginated, filterable list
+- GET /coding-results/stats    -- aggregate summary (fallback count, avg confidence, etc.)
+- GET /coding-results/{id}     -- single record by PK
+
+Documentation: API.md at repo root
+Swagger UI: http://localhost:8000/docs (after docker compose up api)
+
+Deploy on Hetzner:
+  echo "API_KEY=$(openssl rand -hex 32)" >> .env
+  docker compose up api --build -d
 
 ---
 
@@ -102,52 +126,67 @@ MedDRA license:
 
 ---
 
-## Current Status (as of 2026-04-29)
+## Current Status (as of 2026-05-18)
 
 Block A -- Security:     DONE
-Block B -- Server:       DONE (Fail2ban, SSH hardening, Hetzner firewall, autopull cron)
-Block C -- Phase 2:      DONE (Docker + full DB schema live, MAUDE worker, 10k LZG records ingested)
-Block D -- MedDRA:       DONE (MedDRA import, embeddings, hybrid search, reranker, LLM coder, coding worker)
-Block E -- Phase 3/Demo: NOT STARTED
+Block B -- Server:       DONE
+Block C -- Phase 2:      DONE (DB schema live, MAUDE worker, LZG records ingested)
+Block D -- MedDRA:       DONE WITH CAVEAT (see Coding Worker Bug below)
+Block E -- Phase 3/Demo: IN PROGRESS
 
-Last git commit: 2026-04-24 (nightly snapshot). No new code since then.
-Module 2 fully complete as of ~2026-04-20 (CodingWorker, smoke test green).
-Module 3 (PRR/ROR + Grafana + Streamlit) not yet started.
+### Coding Worker Bug (found 2026-05-13, fixed same day)
+Root cause: llm_coder.py used hardcoded "http://localhost:11434" instead of reading
+OLLAMA_BASE_URL env var. In container, localhost != ollama service -> all LLM calls failed.
+Result: ~83% fallback records (llm_confidence=0.3 sentinel) in coding_results.
+Fix applied: OLLAMA_DEFAULT_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+Also added VIGILEX_STRICT mode (raises on connection failure instead of silently using fallback).
+Status: Fix committed. Re-coding run in progress on Hetzner (hybrid mode: code on host, services in docker).
+DB: coding_results_pre_fix backup created, table truncated for clean re-run.
 
-Data ingested so far:
-- LZG (insulin pumps): 10,000 records (2024-01-01 to 2024-12-31)
-  Note: openFDA hard limit is 10,000 per query -- full year is ~17,375 records.
-  Full import needs monthly windowing. Other product codes (PKU, OYC, FRN, QFG) not yet pulled.
+### Grafana Dashboard (DONE 2026-05-12)
+Dashboard UID: sentinelai-coding-v1
+Datasource: vigilex_pg (uid: vigilex_pg), provisioned via grafana/provisioning/datasources/postgres.yaml
+Panels: Coding Throughput, Top 15 AEs, Confidence Distribution, Coding Quality Summary, Full Table
+Note: vigilex_readonly password must be set via ALTER USER after docker compose down/up.
+
+### REST API (DONE 2026-05-18)
+src/vigilex/api/main.py created. See ## REST API section above.
+
+### Data ingested
+- LZG (insulin pumps, 2024): ~10,000 records
+- Other product codes (PKU, OYC, FRN, QFG): NOT YET (out of sprint scope)
+- Full 2015-2024 import: RISK -- deferred to post-Capstone
+
+### Friday Talk #1 (2026-05-15): CANCELLED
+PM Meeting was cancelled 2026-05-14. Materials ready for Talk #2.
+Next talk: Friday Talk #2 (2026-05-22).
 
 ---
 
-## Next Steps
+## Next Steps (as of 2026-05-18)
 
-1. Module 3 -- PRR/ROR signal detection
-   - Create src/vigilex/signals/prr_ror.py
-   - Proportional Reporting Ratio + Reporting Odds Ratio over processed.coding_results
-   - Configurable alert thresholds per device type
+### Immediate (this week)
+1. Verify re-coding run on Hetzner: check coding_results row count + fallback rate
+   Query: SELECT COUNT(*), AVG(final_confidence) FROM processed.coding_results WHERE llm_confidence != 0.3
+2. Grafana: "Top 15 AEs" panel still shows no data -- debug query (pt_name join issue likely)
+3. Friday Talk #2 slides (2026-05-22): start Wednesday 2026-05-20 at latest
 
-2. Full MAUDE import
-   - Split 2015-2024 into monthly windows for LZG
-   - Then pull PKU (pacemakers), OYC (CGM sensors), FRN (defibrillators), QFG (ventilators)
+### REST API (next actions)
+4. Add API_KEY to .env on Hetzner (openssl rand -hex 32)
+5. docker compose up api --build -d on Hetzner
+6. Test: curl -H "X-API-Key: ..." http://localhost:8000/coding-results/stats
 
-3. Grafana dashboard
-   - Signal alerts, confidence distribution, coding throughput
+### Git cleanup (manual -- sandbox limitation prevented automated git rm)
+7. cd vigilex && git rm --cached "notebooks/data/trend_insulinpumpen.png"
+   git rm --cached "pytest-cache-files-htlmj9rw/v/cache/nodeids"
+   git add .gitignore && git commit -m "chore: gitignore pytest-cache-files + notebooks/data"
 
-4. Streamlit frontend
-   - Interactive review queue for low-confidence codings (flagged=True)
-   - Signal browser
+### Later in sprint (Plan B scope)
+8. PRR/ROR signal worker (worker-signal module missing -- not yet implemented)
+9. Stage 3 smoke test (scripts/smoke_test_pipeline.py with both SSH tunnels)
+10. MLflow logging in coding worker
 
-5. Stage 3 end-to-end smoke test
-   - Run scripts/smoke_test_pipeline.py with both SSH tunnels open simultaneously
-
-6. Notebook 02 (02_recall_labels.ipynb)
-   - Recall label join: MAUDE x FDA Recall DB
-   - Check recalled_ever distribution per product code
-   - Retrospective validation: could Module 3 signals have predicted actual recalls?
-
-7. Future work (post-Capstone, not graded)
+### Post-Capstone / Future work
    - EUDAMED integration when API becomes available (~May 2026 mandate)
    - MDR Art. 83-86 compliant report generation (Periodic Safety Update Report template)
    - LoRA finetuning of LLM on FDA adverse event language (RunPod A40, ~$3-5)
@@ -284,6 +323,28 @@ Q&A preparation cards (planned):
 
 ---
 
+## Git Conventions
+
+IMPORTANT -- Sandbox limitation (discovered 2026-05-18):
+- NEVER run git commands via the Cowork/Claude bash sandbox on the Windows repo
+- The Linux sandbox leaves .git/index.lock, .git/config.lock etc. on the Windows
+  filesystem that cannot be deleted by either Windows or the sandbox
+- All git operations (commit, push, checkout, merge, rebase, rm --cached) must be
+  run by Thomas directly in PowerShell or Git Bash
+- Claude may inspect git state read-only (git status, git log, git branch) via bash
+  but must not run any git command that writes to .git/
+
+Active branch: work (default for all new development)
+- main: stable, push-only after merging work
+- work: day-to-day development branch
+
+PowerShell-safe git lock removal (when needed):
+  Remove-Item -Force ".git\config.lock" -ErrorAction SilentlyContinue
+  Remove-Item -Force ".git\index.lock" -ErrorAction SilentlyContinue
+  Remove-Item -Force ".git\objects\maintenance.lock" -ErrorAction SilentlyContinue
+
+---
+
 ## Code Conventions
 
 IMPORTANT -- enforced since 2026-04-10:
@@ -391,17 +452,18 @@ Both share Hetzner CX33 (46.225.109.99). Do not mix deployments.
 
 ## Notebooks Overview
 
-| Notebook | Topic | Status |
-|---|---|---|
-| 01_openfda_maude.ipynb | openFDA API, data pull, EDA | done |
-| 02_recall_labels.ipynb | Recall label join MAUDE x FDA Recall | not yet run |
-| 03_features_and_model.ipynb | Feature engineering, modeling | partial |
-| 04_meddra_eda.ipynb | MedDRA file structure, SOC distribution | done |
-| 05_meddra_hybrid_search.ipynb | Hybrid search walkthrough, RRF formula | done |
-| 06_meddra_reranker.ipynb | CrossEncoder walkthrough, rank change analysis | done |
-| 07_meddra_llm_coding.ipynb | Full pipeline: hybrid -> reranker -> LLM -> DB | done |
-| 08_pipeline_debugging.ipynb | Bug diary: 6 bugs, root causes, fixes | done |
-| 09_coding_worker.ipynb | CodingWorker explained walkthrough | done |
+| Notebook | Topic | Status | Anmerkung |
+|---|---|---|---|
+| 01_openfda_maude.ipynb | openFDA API, data pull, EDA | done | fuehrte zu maude_client.py |
+| 02_recall_labels.ipynb | Recall label join MAUDE x FDA Recall | ARCHIVIERT | in notebooks/archive/ -- alter ML-Pfad |
+| 03_confidence_analysis.ipynb | Live DB-Analyse Confidence-Verteilung | AKTIV | genutzt fuer Fallback-Bug-Diagnose 13.05 |
+| 03b_features_and_model.ipynb | Feature Engineering, Logistic Regression | HISTORISCH | alter ML-Plan vor Architektur-Pivot; umbenannt von 03_ |
+| 04_meddra_eda.ipynb | MedDRA file structure, SOC distribution | done | fuehrte zu embed_meddra_terms.py |
+| 05_meddra_hybrid_search.ipynb | Hybrid search walkthrough, RRF formula | done | fuehrte zu hybrid_search.py |
+| 06_meddra_reranker.ipynb | CrossEncoder walkthrough, rank change analysis | done | fuehrte zu reranker.py |
+| 07_meddra_llm_coding.ipynb | Full pipeline: hybrid -> reranker -> LLM -> DB | done | fuehrte zu llm_coder.py |
+| 08_pipeline_debugging.ipynb | Bug diary -- kein runnable code, reine Doku | DOKU | Interview-Material |
+| 09_coding_worker.ipynb | CodingWorker explained walkthrough | done | fuehrte zu workers/coding.py |
 
 ---
 
