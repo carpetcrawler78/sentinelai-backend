@@ -1,0 +1,19 @@
+# Signal Detection Configuration -- SentinelAI
+# Thresholds follow standard pharmacovigilance conventions (EMA/FDA).
+# Change here to adjust analysis without touching source code.
+
+prr_ror:
+  date_from: "2024-01-01"
+  date_to: "2026-05-18"
+
+  # Standard pharmakovigilance thresholds (EMA guideline):
+  #   min_reports_focal >= 3  (mindestens 3 Berichte fuer stabiles Signal)
+  #   prr_min >= 2.0          (doppelt so haeufig wie in Hintergrundpopulation)
+  #   ci_lower_min >= 1.0     (unteres 95%-Konfidenzintervall ueber 1)
+  thresholds:
+    min_reports_focal: 3
+    prr_min: 2.0
+    ci_lower_min: 1.0
+
+  # Anzahl der Top-Signale in der Ausgabe
+  top_n: 15

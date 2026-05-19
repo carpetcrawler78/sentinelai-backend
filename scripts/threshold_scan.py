@@ -1,39 +1,62 @@
 """
 Threshold scanner -- findet Signal-Schwellenwerte fuer Demo.
-Ausfuehren:
+
+Konfiguration: config/signals.yml (Thresholds, Datumsbereiche)
+
+Ausfuehren auf Hetzner:
+    source scripts/load_host_env.sh
+    python3 scripts/threshold_scan.py
+
+Ausfuehren lokal:
     $env:PYTHONPATH = "src"
     $env:DATABASE_URL = "postgresql://vigilex:PW@localhost:5432/vigilex"
     python scripts/threshold_scan.py
 """
 
+import os
+import yaml
 from datetime import date
 from vigilex.signals.prr_ror import run_prr_ror
 
-DATE_FROM = date(2024, 1, 1)
-DATE_TO   = date(2026, 5, 18)
+# -- Config laden -------------------------------------------------------------
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "signals.yml")
 
-combos = [
-    (min_r, prr, ci)
-    for min_r in [2, 3, 5]
-    for prr   in [1.5, 2.0, 3.0]
-    for ci    in [0.5, 1.0]
-]
+with open(CONFIG_PATH) as f:
+    cfg = yaml.safe_load(f)["prr_ror"]
 
-# Top 10 PRR-Werte anzeigen
+DATE_FROM  = date.fromisoformat(cfg["date_from"])
+DATE_TO    = date.fromisoformat(cfg["date_to"])
+THRESHOLDS = cfg["thresholds"]
+TOP_N      = cfg.get("top_n", 10)
+
+# -- Analyse ------------------------------------------------------------------
 results = run_prr_ror(
     start_date=DATE_FROM,
     end_date=DATE_TO,
-    thresholds={"min_reports_focal": 2, "prr_min": 0.0, "ci_lower_min": 0.0},
+    thresholds=THRESHOLDS,
     dry_run=True,
 )
 
-print(f"Total results: {len(results)}")
-print(f"Results with PRR not None: {sum(1 for r in results if r['prr'] is not None)}")
-if results:
-    print(f"Sample row: {results[0]}")
-top = sorted([r for r in results if r["prr"] is not None], key=lambda x: x["prr"], reverse=True)[:10]
-print(f"\nTop 10 PRR-Werte:")
-print(f"{'pt_name':<45} {'n_focal':>8} {'prr':>8} {'is_signal':>10}")
-print("-" * 75)
+print(f"Total results:              {len(results)}")
+print(f"Results with PRR not None:  {sum(1 for r in results if r['prr'] is not None)}")
+print(f"Active thresholds:          {THRESHOLDS}")
+
+top = sorted(
+    [r for r in results if r["prr"] is not None and r.get("is_signal")],
+    key=lambda x: x["prr"],
+    reverse=True,
+)[:TOP_N]
+
+print(f"\nTop {TOP_N} Signals (PRR >= {THRESHOLDS['prr_min']}, "
+      f"n >= {THRESHOLDS['min_reports_focal']}, "
+      f"CI_lower >= {THRESHOLDS['ci_lower_min']}):")
+print(f"{'pt_name':<45} {'n_focal':>8} {'prr':>8} {'ror':>8} {'ci_lower':>10}")
+print("-" * 85)
 for r in top:
-    print(f"{r['pt_name'][:44]:<45} {r['n_reports_focal']:>8} {r['prr']:>8.2f} {str(r['is_signal']):>10}")
+    print(
+        f"{r['pt_name'][:44]:<45} "
+        f"{r['n_reports_focal']:>8} "
+        f"{r['prr']:>8.2f} "
+        f"{r['ror']:>8.2f} "
+        f"{r['prr_lower_ci']:>10.2f}"
+    )
