@@ -233,14 +233,22 @@ def write_coding_result(conn, result: dict) -> None:
             mdr_report_key,
             pt_code, pt_name, soc_name,
             vector_similarity, crossencoder_score, llm_confidence, final_confidence,
-            model_version, coded_at
+            model_version,
+            coding_path, llm_backend, llm_status, fallback_reason,
+            llm_latency_ms, llm_http_status, llm_raw_response,
+            llm_parse_error, rationale, flagged, debug_meta,
+            coded_at
         )
         VALUES (
             %(mdr_report_key)s,
             %(pt_code)s, %(pt_name)s, %(soc_name)s,
             %(vector_similarity)s, %(crossencoder_score)s,
             %(llm_confidence)s, %(final_confidence)s,
-            %(model_version)s, NOW()
+            %(model_version)s,
+            %(coding_path)s, %(llm_backend)s, %(llm_status)s, %(fallback_reason)s,
+            %(llm_latency_ms)s, %(llm_http_status)s, %(llm_raw_response)s,
+            %(llm_parse_error)s, %(rationale)s, %(flagged)s, %(debug_meta)s,
+            NOW()
         )
         ON CONFLICT DO NOTHING
     """
@@ -351,12 +359,40 @@ def code_report(
     final_pt_name  = top_ce.pt_name
     final_soc_name = top_ce.soc_name
 
+    # Trace defaults. These make each row audit/debuggable without inference.
+    coding_path = "hybrid_ce_skip_llm" if coder is None else "hybrid_ce_llm_pending"
+    llm_backend = None
+    llm_status = "skipped" if coder is None else "pending"
+    fallback_reason = None
+    llm_latency_ms = None
+    llm_http_status = None
+    llm_raw_response = None
+    llm_parse_error = None
+    rationale = None
+    flagged = None
+
     if coder is not None:
         try:
             llm_result     = coder.code(narrative, reranked)
             llm_confidence = llm_result.confidence    # float ODER None (Prod-Fallback)
             final_pt_code  = llm_result.pt_code
             final_pt_name  = llm_result.pt_name
+
+            llm_backend = llm_result.llm_backend
+            llm_status = llm_result.llm_status
+            fallback_reason = llm_result.fallback_reason
+            llm_latency_ms = llm_result.llm_latency_ms
+            llm_http_status = llm_result.llm_http_status
+            llm_raw_response = llm_result.raw_response
+            llm_parse_error = llm_result.llm_parse_error
+            rationale = llm_result.rationale
+            flagged = llm_result.flagged
+            coding_path = (
+                "hybrid_ce_llm_success"
+                if llm_confidence is not None
+                else "hybrid_ce_llm_fallback"
+            )
+
             # soc_name comes from the LLM prompt which sourced it from Stage 2
             # but the LLM does not reliably echo it back -- keep Stage 2's soc_name
         except Exception as exc:
@@ -375,7 +411,13 @@ def code_report(
                 "Stage 3 unexpected exception for %s (%s) -- using Stage 2 top result",
                 report_key, exc,
             )
-            # llm_confidence remains None -> "skip-llm-Pfad" weiter unten
+            coding_path = "hybrid_ce_llm_unexpected_exception"
+            llm_backend = "unknown"
+            llm_status = "unexpected_exception"
+            fallback_reason = type(exc).__name__
+            llm_parse_error = str(exc)
+            flagged = True
+            # llm_confidence remains None -> fallback path weiter unten
 
     # -- Final confidence computation -- drei-Zweig-Logik ---------------------
     # Drei semantisch unterschiedliche Faelle:
@@ -406,6 +448,25 @@ def code_report(
         "llm_confidence":    round(llm_confidence, 6) if llm_confidence is not None else None,
         "final_confidence":  round(final_confidence, 6) if final_confidence is not None else None,
         "model_version":     MODEL_VERSION,
+
+        # Trace / audit columns
+        "coding_path":       coding_path,
+        "llm_backend":       llm_backend,
+        "llm_status":        llm_status,
+        "fallback_reason":   fallback_reason,
+        "llm_latency_ms":    llm_latency_ms,
+        "llm_http_status":   llm_http_status,
+        "llm_raw_response":  llm_raw_response,
+        "llm_parse_error":   llm_parse_error,
+        "rationale":         rationale,
+        "flagged":           flagged,
+        "debug_meta":        psycopg2.extras.Json({
+            "product_code": report.get("product_code"),
+            "strict_mode": STRICT_MODE,
+            "ce_score_norm": round(ce_score_norm, 6),
+            "hybrid_top_k": HYBRID_TOP_K,
+            "rerank_top_k": RERANK_TOP_K,
+        }),
     }
 
 
@@ -435,6 +496,22 @@ def _fallback_result(report_key: str, reason: str = "unknown") -> dict:
         "llm_confidence":    None,
         "final_confidence":  None,   # NULL in DB -- konsistent mit "kein Wert ermittelt"
         "model_version":     MODEL_VERSION + "_fallback",
+
+        # Trace / audit columns
+        "coding_path":       "stage_failure",
+        "llm_backend":       None,
+        "llm_status":        "not_called",
+        "fallback_reason":   reason,
+        "llm_latency_ms":    None,
+        "llm_http_status":   None,
+        "llm_raw_response":  None,
+        "llm_parse_error":   None,
+        "rationale":         f"Pipeline fallback before LLM stage: {reason}",
+        "flagged":           True,
+        "debug_meta":        psycopg2.extras.Json({
+            "fallback_stage": reason,
+            "strict_mode": STRICT_MODE,
+        }),
     }
 
 

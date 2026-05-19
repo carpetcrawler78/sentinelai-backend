@@ -18,7 +18,7 @@
       },
       "datasource": {
         "type": "postgres",
-        "uid": "vigilex-postgres-uid"
+        "uid": "vigilex_pg"
       },
       "options": {
         "tooltip": {
@@ -45,7 +45,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "vigilex-postgres-uid"
+            "uid": "vigilex_pg"
           },
           "rawSql": "SELECT\n  date_trunc('hour', coded_at) AS time,\n  COUNT(*) AS records_coded\nFROM processed.coding_results\nWHERE coded_at >= NOW() - INTERVAL '7 days'\nGROUP BY 1\nORDER BY 1",
           "format": "time_series",
@@ -65,7 +65,7 @@
       },
       "datasource": {
         "type": "postgres",
-        "uid": "vigilex-postgres-uid"
+        "uid": "vigilex_pg"
       },
       "options": {
         "orientation": "horizontal",
@@ -93,7 +93,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "vigilex-postgres-uid"
+            "uid": "vigilex_pg"
           },
           "rawSql": "SELECT\n  pt_name,\n  COUNT(*) AS n_reports\nFROM processed.coding_results\nGROUP BY pt_name\nORDER BY n_reports DESC\nLIMIT 15",
           "format": "table",
@@ -113,7 +113,7 @@
       },
       "datasource": {
         "type": "postgres",
-        "uid": "vigilex-postgres-uid"
+        "uid": "vigilex_pg"
       },
       "options": {
         "bucketSize": "auto",
@@ -139,7 +139,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "vigilex-postgres-uid"
+            "uid": "vigilex_pg"
           },
           "rawSql": "SELECT final_confidence FROM processed.coding_results WHERE final_confidence IS NOT NULL",
           "format": "table",
@@ -159,7 +159,7 @@
       },
       "datasource": {
         "type": "postgres",
-        "uid": "vigilex-postgres-uid"
+        "uid": "vigilex_pg"
       },
       "options": {
         "reduceOptions": {
@@ -182,7 +182,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "vigilex-postgres-uid"
+            "uid": "vigilex_pg"
           },
           "rawSql": "SELECT COUNT(*) AS \"Total Coded\" FROM processed.coding_results",
           "format": "table",
@@ -191,7 +191,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "vigilex-postgres-uid"
+            "uid": "vigilex_pg"
           },
           "rawSql": "SELECT ROUND(AVG(final_confidence)::numeric, 3) AS \"Avg Confidence\" FROM processed.coding_results",
           "format": "table",
@@ -200,7 +200,7 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "vigilex-postgres-uid"
+            "uid": "vigilex_pg"
           },
           "rawSql": "SELECT ROUND(100.0 * SUM(CASE WHEN final_confidence >= 0.7 THEN 1 ELSE 0 END) / COUNT(*)::numeric, 1) AS \"High Conf %\" FROM processed.coding_results",
           "format": "table",
@@ -209,11 +209,50 @@
         {
           "datasource": {
             "type": "postgres",
-            "uid": "vigilex-postgres-uid"
+            "uid": "vigilex_pg"
           },
           "rawSql": "SELECT COUNT(DISTINCT pt_name) AS \"Unique PTs\" FROM processed.coding_results",
           "format": "table",
           "refId": "D"
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "title": "Coding Results -- Full Table",
+      "type": "table",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "vigilex_pg"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "vigilex_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT mdr_report_key, pt_name, pt_code, llt_name, soc_name, ROUND(final_confidence::numeric, 3) AS confidence, ROUND(crossencoder_score::numeric, 3) AS crossencoder, coded_at FROM processed.coding_results ORDER BY coded_at DESC LIMIT 2000",
+          "refId": "A"
         }
       ]
     }
