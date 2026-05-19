@@ -17,4 +17,6 @@ models/*.lgb
 pytest-cache-files-*/
 notebooks/data/
 .coverage
-htmlcov/
+htmlcov/*.log
+coding_*.log
+*.log

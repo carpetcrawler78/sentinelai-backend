@@ -41,6 +41,7 @@ import json
 import re
 import os
 import sys
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -182,6 +183,14 @@ class CodingResult:
     raw_response: str
     flagged:      bool = False  # set to True if confidence < CONFIDENCE_THRESHOLD or fallback
 
+    # Trace / audit fields persisted by workers.coding
+    llm_backend:      Optional[str] = None
+    llm_status:       Optional[str] = None
+    fallback_reason:  Optional[str] = None
+    llm_http_status:  Optional[int] = None
+    llm_latency_ms:   Optional[int] = None
+    llm_parse_error:  Optional[str] = None
+
 
 # ---------------------------------------------------------------------------
 # LLM Coder
@@ -293,23 +302,13 @@ class LLMCoder:
                 raise RuntimeError(msg) from e
             print(f"WARNING: {msg}")
 
-    def _call_ollama(self, user_prompt: str) -> str:
+    def _call_ollama(self, user_prompt: str) -> tuple[str, Optional[int], int]:
         """
-        Send a chat request to Ollama and return the model's response text.
+        Send a chat request to Ollama and return:
+            (response_text, http_status, latency_ms)
 
-        Uses the /api/chat endpoint (multi-turn chat format) which supports
-        system + user messages. The system message sets the model's persona
-        and rules; the user message contains the actual coding task.
-
-        Parameters:
-            stream=False:    wait for the full response before returning
-                             (streaming would require handling partial JSON chunks)
-            temperature=0.1: low value = near-deterministic output
-            num_predict=256: maximum number of tokens in the response
-                             (256 is plenty for a short JSON object)
-
-        Returns:
-            The model's response text (raw string, may contain markdown formatting).
+        On request errors, latency/status are attached to the exception object
+        so the caller can persist trace information.
         """
         payload = {
             "model": self.model,
@@ -323,15 +322,26 @@ class LLMCoder:
                 "num_predict": 256,
             },
         }
-        r = requests.post(
-            f"{self.ollama_url}/api/chat",
-            json=payload,
-            timeout=60,  # 60 seconds is generous; typical response time is 5-15s on CPU
-        )
-        r.raise_for_status()
-        return r.json()["message"]["content"]
 
-    def _call_groq(self, user_prompt: str) -> str:
+        t0 = time.time()
+        http_status: Optional[int] = None
+        try:
+            r = requests.post(
+                f"{self.ollama_url}/api/chat",
+                json=payload,
+                timeout=60,
+            )
+            http_status = r.status_code
+            latency_ms = int((time.time() - t0) * 1000)
+            r.raise_for_status()
+            return r.json()["message"]["content"], http_status, latency_ms
+        except Exception as e:
+            latency_ms = int((time.time() - t0) * 1000)
+            setattr(e, "llm_http_status", http_status)
+            setattr(e, "llm_latency_ms", latency_ms)
+            raise
+
+    def _call_groq(self, user_prompt: str) -> tuple[str, Optional[int], int]:
         """
         Send a chat request to Groq's OpenAI-compatible API.
 
@@ -339,17 +349,14 @@ class LLMCoder:
                  For benchmarking / capstone development only.
                  NOT for production use with real patient data.
 
-        Model: llama-3.1-8b-instant (fast free-tier model, ~300 tokens/sec)
-        API:   https://api.groq.com/openai/v1/chat/completions
-        Auth:  Bearer token via GROQ_API_KEY environment variable
-
         Returns:
-            The model's response text (same format as _call_ollama).
+            (response_text, http_status, latency_ms)
         """
         if not self.groq_api_key:
             raise RuntimeError(
                 "GROQ_API_KEY not set. Export it before running with --groq."
             )
+
         payload = {
             "model":       GROQ_MODEL,
             "messages": [
@@ -363,14 +370,25 @@ class LLMCoder:
             "Authorization": f"Bearer {self.groq_api_key}",
             "Content-Type":  "application/json",
         }
-        r = requests.post(
-            GROQ_API_URL,
-            json=payload,
-            headers=headers,
-            timeout=30,
-        )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+
+        t0 = time.time()
+        http_status: Optional[int] = None
+        try:
+            r = requests.post(
+                GROQ_API_URL,
+                json=payload,
+                headers=headers,
+                timeout=30,
+            )
+            http_status = r.status_code
+            latency_ms = int((time.time() - t0) * 1000)
+            r.raise_for_status()
+            return r.json()["choices"][0]["message"]["content"], http_status, latency_ms
+        except Exception as e:
+            latency_ms = int((time.time() - t0) * 1000)
+            setattr(e, "llm_http_status", http_status)
+            setattr(e, "llm_latency_ms", latency_ms)
+            raise
 
     def _parse_response(self, raw: str, candidates: list[RerankedResult]) -> dict:
         """
@@ -454,42 +472,72 @@ class LLMCoder:
 
         user_prompt = _build_user_prompt(narrative, candidates)
 
+        backend = f"groq:{GROQ_MODEL}" if self.use_groq else f"ollama:{self.model}"
+        raw = ""
+        http_status: Optional[int] = None
+        latency_ms: Optional[int] = None
+
         try:
             if self.use_groq:
-                raw = self._call_groq(user_prompt)
+                raw, http_status, latency_ms = self._call_groq(user_prompt)
             else:
-                raw = self._call_ollama(user_prompt)
+                raw, http_status, latency_ms = self._call_ollama(user_prompt)
             parsed = self._parse_response(raw, candidates)
         except Exception as e:
+            http_status = getattr(e, "llm_http_status", http_status)
+            latency_ms = getattr(e, "llm_latency_ms", latency_ms)
+
+            if isinstance(e, requests.Timeout):
+                llm_status = "timeout"
+                fallback_reason = "llm_timeout"
+                parse_error = None
+            elif isinstance(e, requests.HTTPError):
+                llm_status = "http_error"
+                fallback_reason = "llm_http_error"
+                parse_error = None
+            elif isinstance(e, requests.RequestException):
+                llm_status = "connection_error"
+                fallback_reason = "llm_request_error"
+                parse_error = None
+            elif isinstance(e, (ValueError, json.JSONDecodeError, KeyError, TypeError)):
+                llm_status = "parse_error"
+                fallback_reason = "llm_parse_error"
+                parse_error = str(e)
+            else:
+                llm_status = "unknown_error"
+                fallback_reason = type(e).__name__
+                parse_error = None
+
             if STRICT_MODE:
-                # Dev: keine stillen Fallbacks -- Worker bricht ab.
-                # So sehen wir Bugs sofort statt nach 24h im DB-Spike (siehe Befund 13.05).
-                # Diagnose-Info VOR dem raise, damit man sieht welcher Record es war.
                 top = candidates[0]
                 print(
                     f"STRICT MODE: LLM coding failed -- aborting worker.\n"
                     f"  top CE candidate: {top.pt_name} (code {top.pt_code}, "
                     f"score {top.crossencoder_score:.2f})\n"
+                    f"  status: {llm_status}\n"
+                    f"  fallback_reason: {fallback_reason}\n"
+                    f"  http_status: {http_status}\n"
+                    f"  latency_ms: {latency_ms}\n"
                     f"  error: {type(e).__name__}: {e}"
                 )
                 raise
-            # Production mode: graceful fallback.
-            # confidence=None landet in der DB als NULL -- semantisch korrekt
-            # ("LLM-Antwort nicht ermittelt"). Aggregations-Funktionen (AVG, MEAN)
-            # ueberspringen NULL automatisch -- kein Bias.
-            # flagged=True ist zusaetzliche Code-Wahrheit; confidence IS NULL ist
-            # die DB-Wahrheit auch ohne flagged-Spalte (Tech-Debt: flagged
-            # wird aktuell nicht persistiert).
+
             print(f"LLM coding failed ({e}). Falling back to top CrossEncoder candidate.")
             top = candidates[0]
             return CodingResult(
                 pt_code      = top.pt_code,
                 pt_name      = top.pt_name,
                 soc_name     = top.soc_name,
-                confidence   = None,    # NULL in DB -- LLM ist ausgefallen
+                confidence   = None,
                 rationale    = f"LLM fallback -- using CrossEncoder top result. Error: {e}",
-                raw_response = str(e),
-                flagged      = True,   # always flag LLM fallback cases for human review
+                raw_response = raw or str(e),
+                flagged      = True,
+                llm_backend     = backend,
+                llm_status      = llm_status,
+                fallback_reason = fallback_reason,
+                llm_http_status = http_status,
+                llm_latency_ms  = latency_ms,
+                llm_parse_error = parse_error,
             )
 
         # Build the structured result from the parsed LLM output
@@ -500,7 +548,12 @@ class LLMCoder:
             confidence   = parsed["confidence"],
             rationale    = parsed["rationale"],
             raw_response = raw,
-            # Flag if the LLM's self-reported confidence is below the threshold
             flagged      = parsed["confidence"] < self.confidence_threshold,
+            llm_backend     = backend,
+            llm_status      = "success",
+            fallback_reason = None,
+            llm_http_status = http_status,
+            llm_latency_ms  = latency_ms,
+            llm_parse_error = None,
         )
         return result

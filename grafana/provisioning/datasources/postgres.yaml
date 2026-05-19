@@ -4,12 +4,13 @@ datasources:
   - name: vigilex-postgres
     type: postgres
     uid: vigilex_pg
+    access: proxy
     url: postgres:5432
-    database: ${POSTGRES_DB:-vigilex}
     user: vigilex_readonly
     secureJsonData:
-      password: ${GRAFANA_READONLY_PASSWORD:-CHANGE_ME}
+      password: _Vigilex2024
     jsonData:
+      database: vigilex
       sslmode: disable
       maxOpenConns: 5
       maxIdleConns: 2
