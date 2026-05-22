@@ -4,7 +4,7 @@ Read this file first. It is the single source of truth for any AI assistant
 working on this project. Update the "Current Status" and "Next Steps" sections
 at the end of each working session.
 
-Last updated: 2026-05-18 (API module added, status updated, notebooks reorganised)
+Last updated: 2026-05-21 (eval plan added, schema extension documented, talk #2 prep)
 
 ---
 
@@ -44,9 +44,11 @@ Key files:
 - src/vigilex/data/import_meddra.py     -- MedDRA v29.0 import (PTs + LLTs)
 - src/vigilex/coding/embed_meddra_terms.py -- PubMedBERT embedding generation
 
-Confidence formula: 0.3 * sigmoid(CE logit) + 0.7 * LLM confidence
-Flagged for human review if final_confidence < 0.5
-LLM fallback: if Ollama unreachable, use top CE result with sigmoid(CE logit) as confidence
+Ranking formula (was "confidence formula"):
+  ranking_index = 0.3 * sigmoid(CE logit) + 0.7 * LLM_ordinal_rating
+Heuristic, not calibrated probability. See "Vocabulary -- ranking index vs confidence" below.
+Flagged for human review if ranking_index < 0.5.
+LLM fallback: if Ollama unreachable, use top CE result with sigmoid(CE logit) as ranking_index.
 
 Hybrid search design:
 - BM25: pg_trgm word_similarity(lower(pt_name), lower(narrative)) -- threshold 0.1
@@ -157,6 +159,63 @@ src/vigilex/api/main.py created. See ## REST API section above.
 - Other product codes (PKU, OYC, FRN, QFG): NOT YET (out of sprint scope)
 - Full 2015-2024 import: RISK -- deferred to post-Capstone
 
+---
+
+## Current Status (as of 2026-05-21)
+
+### Coding cohort summary
+
+| Device | Product code | Records | Schema |
+|---|---|---|---|
+| Insulin pumps     | LZG | 9,993 | old (Pre-19.05, llm_status NULL) |
+| Pacemakers        | OYC | 658   | old (Pre-19.05) |
+| CGM sensors       | QFG | 510   | 505 new (Post-19.05, llm_status='success') + 5 trace |
+
+Total: 11,161 records across 3 device types.
+
+### Schema extension (2026-05-19, post-bug-fix iteration)
+
+`processed.coding_results` was extended with 11 columns to enable proper
+operational logging:
+
+- `coding_path`, `llm_backend`, `llm_status`, `fallback_reason`
+- `llm_latency_ms`, `llm_http_status`, `llm_raw_response`, `llm_parse_error`
+- `rationale`, `flagged`, `debug_meta`
+
+Only Post-19.05 records (505 from QFG) have these columns populated.
+Pre-19.05 records have them NULL. Heuristic for old records: `llm_confidence`
+IN (0.30, 0.50, 0.80) is likely Fallback, but this UNDERESTIMATES real LLM
+because the System-Prompt explicitly instructs the LLM to emit these
+discrete values.
+
+Heuristic verdict on the 11,161 cohort:
+- 505 confirmed real LLM (new schema, llm_status=success)
+- 1,288 LZG + 64 OYC = 1,352 likely real LLM (old schema, heuristic)
+- 6,104 LZG + 594 OYC = 6,698 likely fallback (old schema, heuristic)
+- 2,601 skipped_lzg_remainder (intentional skip from 2026-05-18 triage)
+
+Real-world numbers will look better than the heuristic suggests; we cannot
+quantify without re-running on the old records.
+
+### Eval Plan -- new
+
+See `EVAL_PLAN.md` (created 2026-05-21) for the post-Midterm evaluation
+strategy: SQL queries to find real Easy/Hard/I-don't-know cases, the
+`processed.judge_evaluations` table, LLM-as-judge setup (Variante A: Qwen
+or Variante C: self-judge), aggregate metrics, parameter optimization
+roadmap, and preparation for future expert-labeled reference sets.
+
+### Friday Talk #2 / Midterm preparation -- DONE 2026-05-21
+
+- Outline v3 finalized: `presentations/FRIDAY-TALKS/TALK-2/friday_talk_2_outline_v3.md`
+- Lovable prompt v5 final: `presentations/FRIDAY-TALKS/TALK-2/lovable_prompt_talk2_v5_final.md`
+- Deep-dive backup slides built as pptx (7 slides total):
+  - Pipeline overview v2 (workflow form)
+  - PubMedBERT, pg_trgm+LLT, RRF fusion, MiniLM, Llama, Reviewer+Logging
+- Phase structure: setup -> problem -> wie -> warum so -> beweis -> ehrlichkeit -> ausblick
+- Demo cases for the talk are illustrative, NOT pulled from real DB --
+  EVAL_PLAN.md Phase 1 covers extracting real cases post-Midterm.
+
 ### Friday Talk #1 (2026-05-15): CANCELLED
 PM Meeting was cancelled 2026-05-14. Materials ready for Talk #2.
 Next talk: Friday Talk #2 (2026-05-22).
@@ -187,6 +246,9 @@ Next talk: Friday Talk #2 (2026-05-22).
 10. MLflow logging in coding worker
 
 ### Post-Capstone / Future work
+   - Expert-labeled reference set + recall@5 measurement (see EVAL_PLAN.md Phase 4)
+   - Parameter optimization via LLM-as-judge loss function (see EVAL_PLAN.md "Parameter-Optimization")
+   - Reviewer-action persistence (`reviewer_action`, `reviewer_id`, etc. columns missing)
    - EUDAMED integration when API becomes available (~May 2026 mandate)
    - MDR Art. 83-86 compliant report generation (Periodic Safety Update Report template)
    - LoRA finetuning of LLM on FDA adverse event language (RunPod A40, ~$3-5)
@@ -464,6 +526,36 @@ Both share Hetzner CX33 (46.225.109.99). Do not mix deployments.
 | 07_meddra_llm_coding.ipynb | Full pipeline: hybrid -> reranker -> LLM -> DB | done | fuehrte zu llm_coder.py |
 | 08_pipeline_debugging.ipynb | Bug diary -- kein runnable code, reine Doku | DOKU | Interview-Material |
 | 09_coding_worker.ipynb | CodingWorker explained walkthrough | done | fuehrte zu workers/coding.py |
+
+---
+
+## Vocabulary -- ranking index vs confidence (talk + docs)
+
+**For Stakeholder-facing communication (slides, talks, docs, README):**
+- `ranking index` or `ranking score` for the combined output, NEVER `confidence`
+  alone
+- `LLM ordinal rating` for the Stage-3 LLM output
+- "heuristic combination" when describing the formula
+- `records` instead of `audit trail` (on first use: "records (sometimes called
+  audit trail)")
+- Q&A defense for "how accurate is the confidence?":
+  > "It is a heuristic ranking, ordinal -- higher means earlier in the review
+  >  queue, not 'X% correct'."
+
+**For Code:**
+- DB columns remain `llm_confidence`, `final_confidence` -- this is tech debt,
+  do NOT rename across the codebase mid-sprint
+- Python variables in new code: prefer `ranking_index`, `llm_ordinal_rating`
+- Comments should explain that the values are ordinal, not calibrated
+
+**Why:** The LLM System-Prompt explicitly instructs ordinal output:
+  1.0 = perfect match, 0.5 = uncertain, <0.3 = flag for review.
+That is a stepped scale, not a probability. "Confidence" suggests probabilities
+the system doesn't produce. Agreed with Thomas on 2026-05-21.
+
+See also: `feedback_llm_ranking_language.md` in the AI memory system, and the
+"Ranking Index / LLM Ordinal -- Sprachregelung" block in the top-level
+`CAPSTONE II/CLAUDE.md`.
 
 ---
 
