@@ -189,7 +189,7 @@ def evaluate(args):
     print(f"Loaded {len(cases)} eval cases from {eval_path.name}")
 
     # -- Load models --------------------------------------------------------
-    print("Loading EmbeddingModel (PubMedBERT)...")
+    print("Loading EmbeddingModel (all-mpnet-base-v2)...")
     t0 = time.time()
     embedding_model = EmbeddingModel()
     print(f"  EmbeddingModel ready ({time.time()-t0:.1f}s)")
@@ -214,7 +214,7 @@ def evaluate(args):
             print("WARNING: Could not import LLMCoder -- skipping Stage 3")
         else:
             ollama_url = args.ollama_url or os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-            llm_coder = LLMCoder(model=args.stage3_model, ollama_base_url=ollama_url)
+            llm_coder = LLMCoder(model=args.stage3_model, ollama_url=ollama_url)
             print(f"LLMCoder ready: {args.stage3_model} @ {ollama_url}")
 
     # -- MLflow run ---------------------------------------------------------
@@ -228,7 +228,7 @@ def evaluate(args):
         mlflow.log_params({
             "eval_set":         eval_path.name,
             "n_cases":          len(cases),
-            "stage1_model":     "PubMedBERT",
+            "stage1_model": "all-mpnet-base-v2",
             "stage2_model":     "cross-encoder/ms-marco-MiniLM-L-6-v2",
             "stage3_model":     args.stage3_model or "none",
             "rrf_w_bm25":       0.4,

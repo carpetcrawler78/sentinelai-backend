@@ -1,0 +1,31 @@
+
+
+## 2026-05-26 -- Phase 4+5: mpnet Migration + LLT Expansion Eval
+
+- Migration: PubMedBERT -> all-mpnet-base-v2 (embed_meddra_terms_v2.py, 27361 rows, 50 min)
+- Schema: processed.meddra_terms.embedding_mpnet vector(768) + idx_meddra_mpnet_ivfflat
+- hybrid_search.py: EmbeddingModel -> SentenceTransformer, Query Fusion (c1+c2, first_sentence+full_text)
+- Baseline (PubMedBERT vector-only): R@100=0.0 -- vector arm was contributing nothing
+- Post-migration full pipeline: recall_at_5=0.333, soft_recall_at_5=0.500
+- LLT-expansion eval (llt_expanded_top20): no improvement, cat_A 11->12, reverted
+- IVFFlat index idx_meddra_llt_expanded_mpnet built (available for future opt-in experiments)
+- DECISION.md written: data/eval/DECISION.md
+
+
+## 2026-05-27 -- Qwen2.5:7b Eval + Test Suite gruen
+
+### Qwen2.5:7b vs. llama3.2:3b (Stage 3 Model Comparison)
+- Run: qwen25_7b | MLflow Experiment 1 | Run ID: 6549c88cdd57455caa7325b4dc303ee5
+- eval_golden_set.py Bug fix: ollama_base_url -> ollama_url (Signatur-Mismatch)
+- recall_at_5=0.333 | soft_recall_at_5=0.500 | soft_recall_at_10=0.833 | mrr=0.191
+- p_at_1_llm=0.292 vs. p_at_1_reranker=0.083 -- Qwen waehlt aus Top-5 3.5x haeufiger korrekt
+- Recall-Metriken identisch zur llama3.2:3b Baseline (Stage 1+2 Bottleneck unveraendert)
+- cat_A=11, cat_B=5, cat_hit=8 -- identisch zum Baseline-Run
+- 2 LLM-Timeouts (Cases 1+19, qwen7b auf belastetem CX33) -> CE Fallback, kein Metrik-Effekt
+- Elapsed: 1477s (qwen7b) vs ~468s (llama3b) -- 3.15x langsamer
+- Fazit: kein Recall-Gewinn, aber P@1-Verbesserung relevant fuer Production-Top1-Quality
+
+### Tests -- 31/31 gruen
+- test_api.py (12 Tests): FastAPI TestClient, DB gemockt, httpx installiert
+- test_reranker.py (8 Tests): CrossEncoder gemockt, alle Assertions gruen
+- test_prr_ror.py (8 Tests) + test_smoke.py (2+1 Tests): unveraendert gruen
