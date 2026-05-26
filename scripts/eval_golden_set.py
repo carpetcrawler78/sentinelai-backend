@@ -319,8 +319,8 @@ def parse_args():
                    help="PostgreSQL URL (default: $DATABASE_URL)")
     p.add_argument("--ollama-url",    default=None,
                    help="Ollama base URL (default: $OLLAMA_BASE_URL or http://localhost:11434)")
-    p.add_argument("--top-k-stage1",  type=int, default=20,
-                   help="Top-K from Stage 1 hybrid search (default: 20)")
+    p.add_argument("--top-k-stage1",  type=int, default=50,
+                   help="Top-K from Stage 1 hybrid search (default: 50)")
     p.add_argument("--top-k-stage2",  type=int, default=5,
                    help="Top-K from Stage 2 reranker (default: 5)")
     p.add_argument("--candidate-pool", type=int, default=100,
