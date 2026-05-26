@@ -234,6 +234,7 @@ def evaluate(args):
                 stage1_results = searcher.search(mdr_text, top_k=args.top_k_stage1)
                 stage1_codes   = [r.pt_code for r in stage1_results]
 
+<<<<<<< HEAD
                 # Stage 2: CrossEncoder rerank
                 stage2_results = reranker.rerank(mdr_text, stage1_results, top_k=args.top_k_stage2)
                 stage2_codes   = [r.pt_code for r in stage2_results]
@@ -242,6 +243,19 @@ def evaluate(args):
                     print(f"  DEBUG top5: {[(r.pt_code, r.pt_name) for r in stage2_results]}")
                     print(f"  DEBUG expected: {expected_code!r} (type={type(expected_code).__name__})")
 
+=======
+                if i < 3:
+                    print(f"  DEBUG stage1 top5: {[(r.pt_code, r.pt_name) for r in stage1_results[:5]]}")
+                
+                # Stage 2: CrossEncoder rerank
+                stage2_results = reranker.rerank(mdr_text, stage1_results, top_k=args.top_k_stage2)
+                stage2_codes   = [r.pt_code for r in stage2_results]
+                
+                if i < 3:
+                    print(f"  DEBUG top5: {[(r.pt_code, r.pt_name) for r in stage2_results]}")
+                    print(f"  DEBUG expected: {expected_code!r} (type={type(expected_code).__name__})")
+                    
+>>>>>>> 10f8ee0 (auto: hetzner sync 2026-05-25 23:00)
                 rec = {
                     "mdr_report_key":    mdr_key,
                     "expected_pt_code":  expected_code,
