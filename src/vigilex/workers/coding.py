@@ -541,11 +541,11 @@ def load_pipeline(
     Returns:
         (searcher, reranker, coder) -- coder is None when skip_llm=True.
     """
-    logger.info("Loading PubMedBERT embedding model (used by Stage 1 vector search)...")
+    logger.info("Loading all-mpnet-base-v2 embedding model (used by Stage 1 vector search)...")
     t0 = time.time()
     embedding_model = EmbeddingModel()
     logger.info(
-        "PubMedBERT loaded on %s in %.1fs",
+        "all-mpnet-base-v2 loaded on %s in %.1fs",
         embedding_model.device, time.time() - t0
     )
 
