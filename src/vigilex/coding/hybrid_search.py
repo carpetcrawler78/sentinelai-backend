@@ -123,6 +123,10 @@ class EmbeddingModel:
     def __init__(self, model_name: str = MODEL_NAME):
         self._model = SentenceTransformer(model_name)
 
+    @property
+    def device(self):
+        return self._model.device
+
     def encode(self, text: str) -> list[float]:
         """Encode text into a normalised 768-dim vector (L2 unit length)."""
         # normalize_embeddings=True: <=> works without it, but L2 normalization

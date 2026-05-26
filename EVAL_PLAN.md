@@ -1,11 +1,40 @@
 # SentinelAI -- Evaluation Plan (Post-Midterm)
 
-**Stand 2026-05-21. Vorbereitet im Rahmen der Friday Talk #2 / Midterm-Prep.**
+**Stand 2026-05-26. Zuletzt aktualisiert: Phase-4 Golden Set Ergebnisse eingetragen.**
+*(Original erstellt 2026-05-21 im Rahmen Friday Talk #2 / Midterm-Prep.)*
 
 Dieses Dokument beschreibt den Eval-Plan fuer die zweite Haelfte des Capstones
 (22. Mai bis 3. Juni). Hauptziel: messbare Qualitaet ohne Expert-Labels via
 LLM-as-judge, plus Vorbereitung der Datengrundlage fuer Expert-Labels nach
 Capstone-Ende.
+
+---
+
+## Aktueller Eval-Stand (2026-05-26)
+
+Golden Set (`data/eval/golden_set_v1.jsonl`, 24 Cases) + Eval-Pipeline vollstaendig.
+Ergebnisse Stage 1+2 (top_k_stage1=20, top_k_stage2=5):
+
+| Metrik | Wert | Bedeutung |
+|---|---|---|
+| recall_at_5 (strict) | 0.333 | expected PT in Stage-2 top-5 |
+| soft_recall_at_5 | 0.500 | + acceptable_pt_codes |
+| recall_at_10 (strict) | 0.500 | expected PT in Stage-1 top-10 |
+| soft_recall_at_10 | 0.833 | + acceptable_pt_codes |
+| p_at_1_reranker | 0.208 | top-1 Stage-2 == expected PT |
+| mrr | 0.257 | Mean Reciprocal Rank in Stage-2 top-5 |
+| R@100 Stage-1 | 0.750 | candidate recall ceiling |
+
+Bottleneck-Breakdown (Category-Analyse):
+
+- **Cat A** (Stage-1 miss, ~6 Cases): expected PT nicht im 100er-Pool -- Ursache: Vocabulary-Gap
+  (numerische BG-Werte, Geraete-Sprache statt AE-Term). LLT-Expansion adressiert dieses.
+- **Cat B** (CrossEncoder dropped, ~4 Cases): Stage-1 findet es, CrossEncoder verwirft.
+  Groesserer Pool (top_k=50) hilft NICHT -- macht es schlechter (Experiment 2026-05-26).
+- **Cat C/hit** (~14 Cases): im Pool, davon ~8 in top-5.
+
+Soft Recall: acceptable_pt_codes fuer 8 Cases definiert (case-spezifisch, nicht universell).
+Soft R@5 = 0.500 zeigt dass 12/24 Cases zumindest einen klinisch defensiblen PT in top-5 haben.
 
 ---
 
@@ -384,6 +413,16 @@ LLMs, kein Wahrheits-Mass. Die Talk-Defense lautet:
 
 ## To-Do bis 3. Juni
 
+**Eval-Pipeline (Stand 2026-05-26):**
+- [x] Golden Set erstellt: `data/eval/golden_set_v1.jsonl` (24 Cases, 3 Devices)
+- [x] `eval_golden_set.py` mit MLflow-Logging, soft_recall, category breakdown
+- [x] acceptable_pt_codes fuer 8 Miss-Cases (patch_golden_set_acceptable.py)
+- [x] Miss-Analyse (analyze_misses.py): Bottleneck-Typen dokumentiert
+- [x] LLT-Expansion Tabelle + Embedding gestartet (embed_meddra_llt_expanded.py)
+- [ ] LLT-Expansion Index + hybrid_search.py Update (nach Embed-Fertig)
+- [ ] LLT-Eval-Vergleich: R@100 + R@5 mit LLT-expanded vs. pt_only
+
+**LLM-as-judge (Phase 2, noch offen):**
 - [ ] SQL-Queries aus Phase 1 laufen lassen, 3x3 Demo-Cases als CSV exportieren
 - [ ] Migration: `processed.judge_evaluations` Tabelle anlegen
 - [ ] Judge-Prompt v1 als Python-Skizze in `scripts/run_llm_judge.py` bauen
