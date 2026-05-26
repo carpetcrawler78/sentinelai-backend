@@ -116,6 +116,11 @@ def compute_metrics(results: list[dict]) -> dict:
     mrr          = avg([reciprocal_rank(r["expected_pt_code"], r["stage2_top5_codes"])
                         for r in results])
 
+    # Category breakdown: A/B/C/hit
+    by_cat = {"A": 0, "B": 0, "C": 0, "hit": 0}
+    for r in results:
+        by_cat[r.get("category", "A")] += 1
+
     metrics = {
         "recall_at_5":       round(recall_at_5,       4),
         "soft_recall_at_5":  round(soft_recall_at_5,  4),
@@ -124,6 +129,11 @@ def compute_metrics(results: list[dict]) -> dict:
         "p_at_1_reranker":   round(p_at_1_re,         4),
         "mrr":               round(mrr,                4),
         "n_evaluated":       n,
+        # A=not in stage1, B=stage1 yes but reranker dropped, C=reranker top-k not top-5
+        "cat_A_stage1_miss":      by_cat["A"],
+        "cat_B_reranker_dropped": by_cat["B"],
+        "cat_C_reranker_low":     by_cat["C"],
+        "cat_hit":                by_cat["hit"],
     }
 
     # P@1 for LLM stage if available
@@ -256,18 +266,49 @@ def evaluate(args):
                     print(f"  DEBUG top5: {[(r.pt_code, r.pt_name) for r in stage2_results]}")
                     print(f"  DEBUG expected: {expected_code!r} (type={type(expected_code).__name__})")
                     
+                # Ranks: 1-based position in each stage, None if not found
+                stage1_rank = next(
+                    (i + 1 for i, c in enumerate(stage1_codes) if c == expected_code),
+                    None
+                )
+                reranker_rank = next(
+                    (i + 1 for i, c in enumerate(stage2_codes) if c == expected_code),
+                    None
+                )
+                # delta: positive = reranker improved rank, negative = reranker hurt
+                rank_delta = None
+                if stage1_rank is not None and reranker_rank is not None:
+                    rank_delta = stage1_rank - reranker_rank
+
+                # Category for analysis:
+                # A = not in stage1 at all
+                # B = in stage1 but reranker did not include in top-k
+                # C = in stage1 top-k but not in reranker top-5
+                # D = soft hit only (acceptable PT found, expected not found)
+                acceptable = set(case.get("acceptable_pt_codes", []))
+                if stage1_rank is None:
+                    category = "A"
+                elif reranker_rank is None:
+                    category = "B"
+                elif reranker_rank > 5:
+                    category = "C"
+                else:
+                    category = "hit"
+
                 rec = {
-                    "mdr_report_key":    mdr_key,
-                    "expected_pt_code":  expected_code,
-                    "expected_pt_name":  expected_name,
+                    "mdr_report_key":     mdr_key,
+                    "expected_pt_code":   expected_code,
+                    "expected_pt_name":   expected_name,
                     "stage1_top10_codes": stage1_codes[:10],
                     "stage2_top5_codes":  stage2_codes,
-                    "difficulty":        case["difficulty"],
-                    "product_code":      case["product_code"],
-                    "llm_pt_code":       None,
-                    # acceptable_pt_codes: case-specific plausible alternatives
-                    # (empty set for cases without the field)
-                    "acceptable_pt_codes": set(case.get("acceptable_pt_codes", [])),
+                    "stage1_rank":        stage1_rank,
+                    "reranker_rank":      reranker_rank,
+                    "rank_delta":         rank_delta,
+                    "category":           category,
+                    "difficulty":         case["difficulty"],
+                    "product_code":       case["product_code"],
+                    "llm_pt_code":        None,
+                    "acceptable_pt_codes": acceptable,
                 }
 
                 # Stage 3: LLM (optional)
