@@ -177,3 +177,76 @@ def test_get_by_id_not_found(client, mock_db):
     mock_cur.fetchone.return_value = None
     response = client.get("/coding-results/999", headers=AUTH)
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /coding-results/{id}/decision
+# ---------------------------------------------------------------------------
+
+SAMPLE_DECISION_RESPONSE = {
+    "id": 1,
+    "reviewer_action": "accepted",
+    "reviewer_at": datetime(2024, 6, 1, 12, 0, 0),
+    "reviewer_note": None,
+}
+
+
+def test_save_decision_accepted(client, mock_db):
+    _, mock_cur = mock_db
+    mock_cur.fetchone.side_effect = [
+        {"id": 1},                 # existence check
+        SAMPLE_DECISION_RESPONSE,  # UPDATE ... RETURNING
+    ]
+    resp = client.post(
+        "/coding-results/1/decision",
+        json={"action": "accepted"},
+        headers=AUTH,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["reviewer_action"] == "accepted"
+    assert data["id"] == 1
+
+
+def test_save_decision_overridden_with_note(client, mock_db):
+    _, mock_cur = mock_db
+    mock_cur.fetchone.side_effect = [
+        {"id": 1},
+        {**SAMPLE_DECISION_RESPONSE, "reviewer_action": "overridden",
+         "reviewer_note": "Changed to DKA"},
+    ]
+    resp = client.post(
+        "/coding-results/1/decision",
+        json={"action": "overridden", "note": "Changed to DKA"},
+        headers=AUTH,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["reviewer_note"] == "Changed to DKA"
+
+
+def test_save_decision_invalid_action(client, mock_db):
+    resp = client.post(
+        "/coding-results/1/decision",
+        json={"action": "wrong"},
+        headers=AUTH,
+    )
+    assert resp.status_code == 400
+
+
+def test_save_decision_not_found(client, mock_db):
+    _, mock_cur = mock_db
+    mock_cur.fetchone.return_value = None
+    resp = client.post(
+        "/coding-results/99999/decision",
+        json={"action": "accepted"},
+        headers=AUTH,
+    )
+    assert resp.status_code == 404
+
+
+def test_save_decision_no_auth(client):
+    resp = client.post(
+        "/coding-results/1/decision",
+        json={"action": "accepted"},
+    )
+    assert resp.status_code == 401
