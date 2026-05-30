@@ -95,7 +95,7 @@
             "type": "postgres",
             "uid": "vigilex_pg"
           },
-          "rawSql": "SELECT\n  pt_name,\n  COUNT(*) AS n_reports\nFROM processed.coding_results\nGROUP BY pt_name\nORDER BY n_reports DESC\nLIMIT 15",
+          "rawSql": "SELECT pt_name, COUNT(*) AS n\nFROM processed.coding_results\nWHERE pt_name IS NOT NULL\n  AND pt_name NOT LIKE 'SKIPPED%'\n  AND final_confidence > 0.3\n  AND pt_name NOT IN ('Device psychogenic complication', 'Medical device site papule')\nGROUP BY pt_name ORDER BY n DESC LIMIT 15",
           "format": "table",
           "refId": "A"
         }
@@ -103,7 +103,7 @@
     },
     {
       "id": 3,
-      "title": "Confidence Score Distribution",
+      "title": "Ranking Index Distribution",
       "type": "histogram",
       "gridPos": {
         "h": 8,
@@ -193,7 +193,7 @@
             "type": "postgres",
             "uid": "vigilex_pg"
           },
-          "rawSql": "SELECT ROUND(AVG(final_confidence)::numeric, 3) AS \"Avg Confidence\" FROM processed.coding_results",
+          "rawSql": "SELECT ROUND(AVG(final_confidence)::numeric, 3) AS \"Avg Ranking Index\" FROM processed.coding_results",
           "format": "table",
           "refId": "B"
         },
