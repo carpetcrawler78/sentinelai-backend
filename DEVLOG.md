@@ -47,3 +47,21 @@
 
 Fazit: Groq zeigt Upper-Bound der P@1-Qualitaet bei minimalem Throughput-Overhead.
 Production-excluded by design (GDPR Art.44+Art.9), nicht wegen Capability.
+
+## 2026-05-31 -- Grafana Histogram Fix (Panel id=3)
+- DONE: Panel "Ranking Index Distribution" von histogram auf barchart umgestellt; Bucketing nach SQL vorgezogen (width_bucket 10 Buckets 0.0-0.9); Dashboard via Grafana API zurueckgeschrieben (version 9, status success)
+- MISTAKE: histogram-Typ + PostgreSQL table-format + raw numeric column = client-seitiges Bucketing schlaegt fehl (Grafana-bekannte Inkompatibilitaet); erst nach Diagnose-Queries klar
+- RULE: Fuer SQL-Datasources immer barchart + SQL-Aggregation statt histogram-Panel-Typ
+
+## 2026-05-31 09:22 -- Grafana Dashboard sentinelai-coding-v1 Fix
+- DONE: Panel 3 (Ranking Index Distribution) auf barchart umgestellt + SQL width_bucket()-Aggregation; filter coding_path='hybrid_ce_llm_success' (Pre-Fix-Records raus)
+- DONE: Panel 2 (Top 15 MedDRA PT Codes) geloescht (leer nach Post-Fix-Filter)
+- DONE: Panel 1 (Coding Throughput) + Panel 99 (Full Table) gefiltert auf coding_path IS NOT NULL
+- DONE: Panel 4 (System Summary) -- neues Stat-Tile "Pre-Fix Records" + gefilterte "Unique PTs"
+- DONE: Workflow-Fix -- Provisioning-JSON auf Hetzner aktualisiert + reload getriggert (verhindert Grafana-Revert)
+- OFFEN: Eval-Panels 5+6 stehen doppelt zu Panel 4 (Soft Recall@5/@10) -- Entscheidung pending
+- OFFEN: Luecke oben rechts (ex Panel 2) -- neues Panel oder leer lassen -- Entscheidung pending
+
+## 2026-05-31 17:42 -- Datum-Fix + Slide-Rename + Pipeline-Refactor
+- DONE: Datums-Footer auf 03 Jun 2026 korrigiert (6 Dateien: slide2, slide_eng_tools, slide_gold, slide_metrics, slide_pipeline_a, GrafanaSlide.tsx), routes/index.tsx Titel auf "Final Presentation", Pipeline.tsx als wiederverwendbares Component extrahiert (Slot 10, reveal-Prop "abstract"/"models"), alle 14 aktiven Slide-Dateien auf Slide0N_Name-Schema umbenannt, Deck.tsx-Imports aktualisiert, Build gruen (221 modules, 2.2s).
+- MISTAKE: Kein -- tote Imports in Deck.tsx waren nicht vorhanden (slide_final existiert in data/ aber war nie importiert).
