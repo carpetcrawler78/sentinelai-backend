@@ -68,3 +68,29 @@ Production-excluded by design (GDPR Art.44+Art.9), nicht wegen Capability.
 
 ## 2026-05-31 18:00 -- Housekeeping: tote Slides nach alt/
 - DONE: SlideB.tsx (identische Kopie in alt/ bestaetigt per SHA256), slide5.html, slide_final.html nach alt/ verschoben; Build gruen (221/279 modules, 1.93s).
+
+## 2026-06-01 20:10 -- Grafana Ranking Index Colors + Pipeline Health Blue
+- DONE: Live dashboard (sentinelai-coding-v1) updated via API, version 48 -> 49
+- DONE: Panel "Ranking Index Distribution" (id=3) -- SQL rewritten to return
+  three series (01 Flag for Review / 02 Uncertain / 03 Accept) split by
+  triage thresholds (< 0.30 / 0.30-0.65 / >= 0.65). Field overrides set
+  identically to Triage panel: #E05252 red / #E8C84A yellow / #52B788 green.
+  Threshold note: upper boundary is 0.65 (not 0.70 as assumed in task prompt).
+- DONE: Panel "Pipeline Health" (id=100) -- defaults.color changed from
+  threshold-driven (mode=thresholds) to fixed blue (#1F6FEB, mode=fixed).
+  SQL and unit properties unchanged. Red/yellow/green threshold steps remain
+  in overrides but do not drive color with mode=fixed. Visual effect: all
+  four stat tiles (LLM Success %, Flagged %, Timeout %, Avg LLM (s)) show
+  blue backgrounds, distinct from triage/coding outcome panels.
+- DONE: grafana/provisioning/dashboards/sentinelai_coding.json updated to
+  match live dashboard (v49). Old file was stale version 5 (7 panels,
+  included obsolete Eval Quality + Coding Outcome panels).
+- DONE: Updated provisioning file SCPed to Hetzner. No Grafana restart.
+  No provisioning reload triggered. allowUiUpdates=true + updateIntervalSeconds=30
+  in dashboards.yaml; file on Hetzner matches live, no revert risk on restart.
+- BACKUP before: backups/grafana_live_before_ranking_colors_20260601_2003.json
+- BACKUP after:  backups/grafana_live_after_ranking_colors_20260601_2010.json
+- MISTAKE: Attempted long inline SSH/Python one-liner commands; hit Claude Code
+  965-byte parser limit multiple times before switching to script-file pattern.
+- RULE: No inline shell command over ~800 bytes. JSON payloads to files, not inline.
+  See CLAUDE_CODE_ERRORS.md.
