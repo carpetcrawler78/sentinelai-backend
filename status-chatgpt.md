@@ -24,6 +24,16 @@ Clarification:
 - It is not automatically the source of truth for all historic CVs, Enhancv exports, application documents or certificates.
 - Existing CVs in other Drive locations remain input/source material and can be used when explicitly selected.
 
+## Assistant role boundary
+
+Important standing rule added to `PROJECT_MEMORY.md`:
+
+- ChatGPT must only handle discussion, planning, analysis, review, document strategy and prompt/text drafting.
+- ChatGPT must not execute code, run terminal commands, run scripts, or perform operative implementation work for this project.
+- Claude Code / Fable / Opus is the execution-side master for code, filesystem changes, scripts and operative implementation.
+- Working model: ChatGPT = master planner/reviewer/strategist; Claude Code/Fable/Opus = execution master.
+- At the start of every future ChatGPT session on this project, first read `PROJECT_MEMORY.md`, then read `status-chatgpt.md`.
+
 ## Files created in GitHub
 
 - `README.md`
@@ -91,3 +101,5 @@ From previous Drive searches, existing material supports:
 ## Next recommended step
 
 Use the existing Enhancv AI/Data Scientist CV as the base and convert it first into the `Health AI Engineer` version. Then check for CDM-fallback wording and ATS readability.
+
+For implementation work, prepare instructions/prompts for Claude Code/Fable/Opus rather than executing code directly in ChatGPT.
