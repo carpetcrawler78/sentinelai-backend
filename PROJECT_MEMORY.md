@@ -2,6 +2,18 @@
 
 This file records standing project instructions and decisions that should persist across ChatGPT sessions.
 
+## Mandatory startup rule
+
+At the start of every ChatGPT session that works on the `job-search-system` project, first read this file:
+
+`PROJECT_MEMORY.md`
+
+Then read the current handoff/status file:
+
+`status-chatgpt.md`
+
+Use both files before making plans, editing project files or discussing next steps.
+
 ## Source of truth
 
 Google Drive folder:
@@ -24,6 +36,29 @@ GitHub repository:
 `carpetcrawler78/job-search-system`
 
 is the versioned working repository for Markdown files, prompts, tracker templates, scoring rules, CV strategy drafts, cover-letter templates and project memory.
+
+## Assistant role boundary
+
+ChatGPT's role in this project is **discussion, planning, analysis, review and text/prompt drafting only**.
+
+ChatGPT must **not** execute code, run local scripts, run terminal commands, perform implementation work, or act as the operative coding/execution agent for this project.
+
+Operational execution belongs to Claude Code / Fable / Opus or another explicitly designated execution tool/agent.
+
+Working model:
+
+- ChatGPT = master planner / reviewer / strategist / prompt and document designer.
+- Claude Code / Fable / Opus = execution-side master for code, filesystem implementation, scripts and operative changes.
+
+If implementation is needed, ChatGPT should provide:
+
+- exact plan
+- acceptance criteria
+- file-by-file instructions
+- prompts for Claude Code / Fable / Opus
+- review checklist
+
+but should not itself execute code.
 
 ## Status handoff rule
 
