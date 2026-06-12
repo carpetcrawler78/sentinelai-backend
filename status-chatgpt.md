@@ -128,3 +128,40 @@ The status file should function as a chronological project log, not as a single 
 - Add LinkedIn draft.
 - Add SentinelAI/Vigilex portfolio summary.
 - Keep ChatGPT role limited to planning/review/text/prompt work; Claude Code/Fable/Opus handles execution.
+
+---
+
+## Session update — 2026-06-12 — three-file startup and discrepancy rule
+
+### Change made
+
+`PROJECT_MEMORY.md` was updated to define itself as the single source of truth for standing project rules, current planning and execution coordination.
+
+### New startup rule
+
+At the start of every ChatGPT session on `job-search-system`, read:
+
+1. `PROJECT_MEMORY.md`
+2. `status-chatgpt.md`
+3. `status-claude.md`
+
+Then check the three files for discrepancies and report discrepancies immediately before continuing.
+
+### File-role clarification
+
+- `PROJECT_MEMORY.md` = single source of truth for rules, planning, execution coordination and workflow.
+- `status-chatgpt.md` = append-only chronological handoff log for ChatGPT sessions.
+- `status-claude.md` = append-only chronological handoff log for Claude Code / Fable / Opus sessions.
+
+### Discrepancy found in this session
+
+`status-claude.md` was requested as part of the three-file startup rule, but it was not found in the GitHub repository at the time of checking.
+
+### Current open tasks remain
+
+- Ensure `status-claude.md` exists if Claude/Fable/Opus will maintain its own handoff log.
+- Identify best existing Enhancv CV base version.
+- Build three concrete CV text versions.
+- Add bullet library.
+- Add LinkedIn draft.
+- Add SentinelAI/Vigilex portfolio summary.
