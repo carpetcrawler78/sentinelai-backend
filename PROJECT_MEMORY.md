@@ -1,20 +1,47 @@
 # Project Memory — job-search-system
 
-This file records standing project instructions and decisions that should persist across ChatGPT sessions.
+This file is the single source of truth for standing project instructions, current planning rules and execution coordination.
 
 ## Mandatory startup rule
 
-At the start of every ChatGPT session that works on the `job-search-system` project, first read this file:
+At the start of every ChatGPT session that works on the `job-search-system` project, read these three files before making plans, editing project files or discussing next steps:
 
-`PROJECT_MEMORY.md`
+1. `PROJECT_MEMORY.md`
+2. `status-chatgpt.md`
+3. `status-claude.md`
 
-Then read the current handoff/status file:
+After reading them, immediately check for discrepancies between the three files and report any discrepancy to the user before continuing.
 
-`status-chatgpt.md`
+If a status file is missing, report that as a discrepancy.
 
-Use both files before making plans, editing project files or discussing next steps.
+## File roles
 
-## Source of truth
+### PROJECT_MEMORY.md
+
+`PROJECT_MEMORY.md` is the single source of truth for:
+
+- standing project rules
+- current planning decisions
+- execution coordination rules
+- source-of-truth definitions
+- role boundaries between master LLMs and execution agents
+- latest agreed project workflow
+
+If `PROJECT_MEMORY.md` conflicts with a status file, `PROJECT_MEMORY.md` wins.
+
+### status-chatgpt.md
+
+`status-chatgpt.md` is an append-only chronological handoff log for ChatGPT sessions.
+
+It should preserve prior entries and add new dated entries at the bottom.
+
+### status-claude.md
+
+`status-claude.md` is an append-only chronological handoff log for Claude Code / Fable / Opus sessions.
+
+It should preserve prior entries and add new dated entries at the bottom.
+
+## Source of truth for project files
 
 Google Drive folder:
 
@@ -62,9 +89,10 @@ but should not itself execute code.
 
 ## Status handoff rule
 
-At the end of every working session on the `job-search-system` project, append a new dated entry to:
+At the end of every working session on the `job-search-system` project, append a new dated entry to the relevant status file.
 
-`status-chatgpt.md`
+- ChatGPT sessions append to `status-chatgpt.md`.
+- Claude Code / Fable / Opus sessions append to `status-claude.md`.
 
 Append-only rule: preserve all earlier status entries and add each new session update at the bottom of the file.
 
@@ -76,6 +104,7 @@ The appended update should summarize:
 - open tasks
 - next recommended steps
 - any important caveats or source-of-truth clarifications
+- discrepancies found between project memory and status files, if any
 
 ## Strategic job-search rule
 
