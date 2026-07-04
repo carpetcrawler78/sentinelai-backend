@@ -1,136 +1,133 @@
-# vigilex / SentinelAI
-**MedDRA coding assistance for medical-device adverse-event reports**
+# SentinelAI (Backend: vigilex)
 
-A three-stage local pipeline that turns free-text MAUDE narratives into
-ranked MedDRA Preferred Term suggestions. Built as Capstone II of the
-neue fische AI Engineering Bootcamp 2025/2026.
+> Status: Completed capstone / portfolio project.
+> The original Hetzner deployment is no longer running (deliberately paused,
+> not a bug -- kept offline to avoid ongoing hosting cost) -- this repository
+> documents the backend architecture, the coding pipeline, and the evaluation
+> results of a working system.
 
 Internal repo name: `vigilex`. Public name in presentations and portfolio:
 `SentinelAI`.
 
 ---
 
-## What it does
+## Why this project exists
 
 Medical-device manufacturers must code every adverse-event report against
 the MedDRA terminology (~27k Preferred Terms) for regulatory submission.
 Today this is manual: one safety officer per company, ~10 min per case,
-~70% inter-coder agreement.
+~70% inter-coder agreement. SentinelAI was built as Capstone II of the
+neue fische AI Engineering Bootcamp 2025/2026 to test whether a retrieval +
+reranking + local-LLM pipeline can narrow that search space and produce
+consistent, auditable suggestions -- without sending patient-adjacent data
+to an external API.
 
-SentinelAI assists this workflow:
+The architecture is built around three EU regulations: GDPR (no patient
+data outside EU), EU AI Act (high-risk = human-in-the-loop), EU MDR
+(post-market surveillance + reproducible records).
 
-- **Narrows the choice** -- from 27,361 MedDRA PTs to a ranked top-5
-  with a written rationale per candidate
+## What the system does
+
+- **Narrows the choice** -- from ~27k MedDRA PTs to a ranked top-5 with a
+  written rationale per candidate
 - **Same method every time** -- removes day-to-day variation between coders
 - **Reviewer stays in charge** -- the system suggests, the human decides;
-  every step is persisted for regulatory records
+  every accept/correct/reject decision is persisted for regulatory records
+- **Downstream demo** -- PRR/ROR disproportionality analysis on the coded
+  data, visualized in Grafana (signal detection is a demo of the coded
+  output, not a second product scope)
 
-The architecture is built around three EU regulations:
-GDPR (no patient data outside EU), EU AI Act (high-risk = human-in-the-loop),
-EU MDR (post-market surveillance + reproducible records).
+## Architecture
 
----
-
-## Three-stage pipeline
+Three-stage local pipeline, turning a free-text MAUDE narrative into ranked
+MedDRA Preferred Term suggestions:
 
 ```
 27k MedDRA terms                MAUDE narrative (free text)
         |                                |
         |                                v
         |               Stage 1 -- RETRIEVE  (~0.5 sec)
-        |               PubMedBERT bi-encoder via pgvector
+        |               all-mpnet-base-v2 bi-encoder via pgvector (IVFFlat)
         |               +  pg_trgm trigram on pt_name + 88k LLT synonyms
         |               -> RRF fusion (w_lex=0.4, w_vec=0.6, k=60)
         |                                v
         |                            Top-20
         |                                v
-        |               Stage 2 -- RERANK  (~20 ms)
-        |               MiniLM cross-encoder, joint attention on (narrative, pt_name)
+        |               Stage 2 -- RERANK
+        |               ELECTRA-base cross-encoder, joint attention on
+        |               (narrative, pt_name)
         |                                v
         |                             Top-5
         |                                v
-        |               Stage 3 -- SUGGEST  (~5-50 sec)
-        |               Llama 3.2:3b via Ollama, local on Hetzner CX33
+        |               Stage 3 -- SUGGEST
+        |               qwen2.5:7b via Ollama, local (on-prem)
         |               -> JSON: pt_code, ordinal_rating, rationale
         |                                v
-        |                ranking_index = 0.3 * sigmoid(CE) + 0.7 * LLM_ordinal
+        |                ranking_index = weighted(CE score, LLM ordinal rating)
         |                                v
         |                  Reviewer UI -- accept / correct / reject
         |                                v
         +--------> processed.coding_results (audit-grade row per case)
 ```
 
+Note: `all-mpnet-base-v2` (Stage 1), `ELECTRA-base` (Stage 2) and
+`qwen2.5:7b` (Stage 3) are the current winning models after the Phase 4 /
+evaluation runs; earlier baselines (PubMedBERT, MiniLM cross-encoder,
+llama3.2:3b) are documented in `DEVLOG.md` and `EVAL_PLAN.md` for
+comparison. `ranking_index` is a **heuristic ordinal value**, not a
+calibrated probability -- the reviewer UI uses it as a triage signal
+(higher = earlier in the review queue), never as "X% correct".
+
 ### Why hybrid retrieval?
-BM25/trigram catches exact MedDRA-vocabulary matches; semantic search via
-PubMedBERT catches paraphrases (`low blood sugar` ~ `Hypoglycaemia`).
-RRF fuses the two ranks without depending on incompatible score scales.
+BM25/trigram catches exact MedDRA-vocabulary matches; semantic search
+catches paraphrases (`low blood sugar` ~ `Hypoglycaemia`). RRF fuses the
+two ranks without depending on incompatible score scales. Index: pgvector
+IVFFlat in PostgreSQL (not FAISS).
 
 ### Why a cross-encoder in Stage 2?
-The bi-encoder from Stage 1 compares pre-computed vectors; the cross-encoder
-reads (narrative, candidate) jointly and catches negation, primary-vs-secondary,
-and relation logic. Too slow for 27k candidates, fast enough for 20.
+The bi-encoder from Stage 1 compares pre-computed vectors; the
+cross-encoder reads (narrative, candidate) jointly and catches negation,
+primary-vs-secondary, and relation logic. Too slow for 27k candidates, fast
+enough for 20.
 
 ### Why a local LLM?
 GDPR Art. 44 + the EU AI Act make external LLM APIs incompatible with
-patient-data workflows. Llama 3.2:3b via Ollama on Hetzner CX33 keeps the
-narrative inside EU infrastructure with a pinned model version.
+patient-data workflows. Groq-hosted models were benchmarked for reference
+only and are explicitly excluded from any production path.
 
----
+## Tech stack
 
-## Vocabulary note
+- **Language / API:** Python, FastAPI (`src/vigilex/api/main.py`,
+  X-API-Key auth)
+- **Database:** PostgreSQL + pgvector (IVFFlat) + pg_trgm
+- **Orchestration:** Docker Compose (Postgres, Ollama, ingest worker, coding
+  worker, API, Grafana)
+- **LLM runtime:** Ollama, local models (qwen2.5:7b / llama3.2:3b baseline)
+- **Experiment tracking:** MLflow
+- **Dashboards:** Grafana (provisioned datasources + dashboards)
+- **Testing:** pytest
 
-The pipeline emits `ranking_index` (combined Stage 2 + Stage 3 score) and
-`LLM_ordinal_rating` (raw Stage 3 output). These are **heuristic ordinal
-values**, not calibrated probabilities. The reviewer UI uses them as a triage
-signal: higher means earlier in the review queue, NOT "X% correct".
+## Repository status
 
-The DB columns are still named `llm_confidence` and `final_confidence` for
-historical reasons -- that is tech debt and the names will be aligned in a
-future migration.
-
----
-
-## Repository layout
-
-```
-vigilex/
-|-- src/vigilex/
-|   |-- coding/           # Stage 1-3 implementations
-|   |   |-- hybrid_search.py    # PubMedBERT + pg_trgm + RRF
-|   |   |-- reranker.py         # MiniLM CrossEncoder
-|   |   |-- llm_coder.py        # Llama via Ollama
-|   |   `-- embed_meddra_terms.py
-|   |-- workers/          # CodingWorker (SQL queue + polling)
-|   |-- data/             # MAUDE client + flatten_maude_record()
-|   |-- db/               # psycopg2 connection helpers
-|   |-- api/              # FastAPI REST endpoints
-|   `-- signals/          # PRR/ROR disproportionality (skeleton)
-|-- docker/               # Compose stack: Postgres, Ollama, Worker, API
-|-- grafana/              # Dashboards + datasources (provisioned)
-|-- notebooks/            # 01-09: EDA, hybrid search, reranker, LLM, debugging
-|-- tests/                # pytest suite (PRR/ROR + smoke tests)
-|-- API.md                # REST API documentation
-|-- CLAUDE.md             # AI-assistant project briefing (READ THIS FIRST)
-|-- EVAL_PLAN.md          # Post-Midterm evaluation plan + LLM-as-judge setup
-|-- DEVLOG.md             # chronological development diary
-`-- README.md             # this file
-```
-
----
-
-## Data sources
-
-| Source | Role |
+| Component | Can be run locally today? |
 |---|---|
-| [openFDA MAUDE](https://open.fda.gov/apis/device/event/) | adverse-event narratives + device metadata |
-| [MedDRA v29.0](https://www.meddra.org/) | ~27k Preferred Terms + 88k Lowest Level Term synonyms |
-| EU MDR 2017/745, EU AI Act, GDPR | architectural constraints (not RAG content) |
+| Test suite (pytest) | Yes |
+| DB schema / migrations | Yes |
+| Reduced demo dataset (no license needed) | Not yet -- planned as a separate follow-up, not part of this snapshot |
+| Full MedDRA / MAUDE pipeline end-to-end | Only with your own licensed MedDRA files (`raw_data/` is gitignored, not included) |
+| Hetzner production server | Offline -- deliberately paused, not reactivated for this portfolio snapshot |
 
-MedDRA is licensed -- data files live outside version control (`.gitignore`).
+## Demo artifacts
 
----
+![Grafana operations dashboard](docs/screenshots/grafana_dashboard.png)
 
-## Setup (local development)
+Grafana dashboard screenshot (signal-detection demo panels + pipeline
+health strip), taken from the live deployment before it was paused.
+
+A reviewer-workflow screenshot and a standalone architecture diagram are
+not yet part of this repository -- open item, to be added later.
+
+## Local setup
 
 ```bash
 # Clone and install
@@ -140,65 +137,69 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 
-# Configure (Hetzner DB connection string + Ollama URL)
+# Configure
 cp .env.example .env
 # Edit .env with your DATABASE_URL, OLLAMA_BASE_URL, API_KEY
 
 # Optional: openFDA API key (raises rate limit from 1k to 120k req/day)
 # Free at https://open.fda.gov/apis/authentication/
+
+# Run tests
+pytest
 ```
 
-Production stack runs entirely in Docker on Hetzner CX33 (Nuremberg). See
-`docker/docker-compose.yml` for the full service topology (Postgres + pgvector,
-Ollama, MAUDE ingest worker, coding worker, FastAPI, Grafana).
+The full stack (Postgres + pgvector, Ollama, ingest worker, coding worker,
+FastAPI, Grafana) is defined in `docker/docker-compose.yml`. It previously
+ran on a Hetzner CX33 instance (Nuremberg, EU) that has since been paused.
 
----
+## What is included / not included
 
-## Status (2026-05-21)
+**Included:** full source for all three pipeline stages, REST API, Grafana
+provisioning, database schema/migrations, evaluation scripts and frozen
+results, pytest suite, development diary (`DEVLOG.md`), architecture and
+decision docs.
 
-- **Ingestion** -- 3 device cohorts ingested (LZG insulin pumps,
-  OYC pacemakers, QFG CGM sensors)
-- **Coding** -- 11,161 reports coded across the three device types
-  (LZG 9,993, OYC 658, QFG 510)
-- **Schema** -- coding_results extended 2026-05-19 with operational logging
-  columns (`llm_status`, `coding_path`, `fallback_reason`, `rationale`, etc.)
-- **REST API** -- `src/vigilex/api/main.py`, X-API-Key auth, deployed via Docker
-- **Grafana** -- dashboard `sentinelai-coding-v1` provisioned
-- **Mid-Term Talk** -- 2026-05-22, materials in
-  `../presentations/FRIDAY-TALKS/TALK-2/`
+**Not included:** MedDRA reference data (licensed, must be obtained
+separately), MAUDE raw data snapshots, `.env` secrets, a running server.
 
-See `CLAUDE.md` for the full status block and `EVAL_PLAN.md` for the
-post-Midterm evaluation roadmap.
+## Results
 
----
+Evaluation on a 24-case golden set (Stage 1+2, `top_k_stage1=20`,
+`llama3.2:3b` baseline):
 
-## Roadmap
+- recall@5 = 0.333, soft_recall@5 = 0.500
+- recall@10 = 0.500, soft_recall@10 = 0.833
+- p@1 = 0.083, MRR = 0.191, R@100 = 0.750
 
-**Capstone, second half (22 May - 3 June)**
-- Reviewer UI end-to-end (`reviewer_action` columns persist accept/correct/reject)
-- LLM-as-judge agreement measurement (see `EVAL_PLAN.md`)
-- Grafana dashboard finalised + REST API deployed
-- Friday Talk #3 = dry run for Final Presentation
+Best on-prem stack found (ELECTRA-base reranker + qwen2.5:7b):
 
-**Beyond Capstone**
-- Expert-labeled reference set -> strict recall@5 measurement
-- Parameter optimization via LLM-as-judge loss function
-- Full historical MAUDE import (2015-2024)
-- Statistical signal detection on coded data (PRR/ROR)
-- EUDAMED integration (mandate ~May 2026)
-- LoRA finetuning of LLM on FDA adverse-event language
+- recall@5 = 0.375, soft_recall@5 = 0.625, p@1_llm = 0.375
+- Matches a Groq-hosted reference run on p@1_llm, without any external API
+  call -- i.e. on-prem parity with a cloud LLM, while staying inside the
+  GDPR/EU AI Act constraints described above.
 
----
+Full breakdown, category analysis (Stage-1 miss vs. cross-encoder drop),
+and MLflow run names are in `DEVLOG.md` and `EVAL_PLAN.md`.
 
-## Background
+## Known limitations
 
-Built by Thomas Heger -- Dr. sc. ETH Biochemistry, former Clinical Data Manager
-at DKFZ Heidelberg (REQUITE, RADprecise post-market surveillance studies).
-Domain expertise in GCP documentation, MDR conformity, and EU regulatory
-context informs both the architecture choices and the talk framing of this
-project.
+- Bottleneck is Stage-1 retrieval misses (`cat_A`), unchanged across all
+  evaluated configurations -- the reranker and LLM stages cannot recover a
+  candidate that Stage 1 never retrieves.
+- `llm_confidence` / `final_confidence` column names are historical; the
+  values are heuristic ordinal ratings, not calibrated probabilities
+  (planned rename in a future migration).
+- Golden set is 24 cases -- enough to compare configurations, not a
+  statistically powered clinical validation.
+- No reduced/synthetic demo dataset shipped yet (see "Repository status").
 
----
+## Author
+
+Built by Thomas Heger -- Dr. sc. ETH Biochemistry, former Clinical Data
+Manager at DKFZ Heidelberg (REQUITE, RADprecise post-market surveillance
+studies). Domain expertise in GCP documentation, MDR conformity, and EU
+regulatory context informs both the architecture choices and the
+evaluation framing of this project.
 
 ## License
 
