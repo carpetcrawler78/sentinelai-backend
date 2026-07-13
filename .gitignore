@@ -21,3 +21,4 @@ htmlcov/*.log
 coding_*.log
 *.log
 *.log
+_internal_dev/
