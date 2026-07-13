@@ -90,7 +90,6 @@ Production-excluded by design (GDPR Art.44+Art.9), nicht wegen Capability.
   in dashboards.yaml; file on Hetzner matches live, no revert risk on restart.
 - BACKUP before: backups/grafana_live_before_ranking_colors_20260601_2003.json
 - BACKUP after:  backups/grafana_live_after_ranking_colors_20260601_2010.json
-- MISTAKE: Attempted long inline SSH/Python one-liner commands; hit Claude Code
-  965-byte parser limit multiple times before switching to script-file pattern.
+- MISTAKE: Attempted long inline SSH/Python one-liner commands -- turned out fragile
+  and hard to debug when something failed midway. Switched to small script files instead.
 - RULE: No inline shell command over ~800 bytes. JSON payloads to files, not inline.
-  See CLAUDE_CODE_ERRORS.md.
