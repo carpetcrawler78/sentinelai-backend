@@ -14,7 +14,7 @@ Regulated safety workflows frequently require adverse-event narratives to be
 mapped to standardized medical terminology such as MedDRA. Manual coding is
 time-consuming and shows inter-coder variability. SentinelAI explores
 AI-assisted MedDRA coding using public MAUDE narratives as the evaluation
-corpus. SentinelAI was built as Capstone II of the neue fische AI Engineering
+corpus. MAUDE is a FDA-based database for adverse events from medical devices. SentinelAI was built as Capstone II of the neue fische AI Engineering
 Bootcamp 2025/2026 to test whether a retrieval + reranking + local-LLM
 pipeline can narrow that search space and produce consistent, auditable
 suggestions -- without sending patient-adjacent data to an external API.
@@ -79,7 +79,7 @@ calibrated probability -- the reviewer UI uses it as a triage signal
 BM25/trigram catches exact MedDRA-vocabulary matches; semantic search
 catches paraphrases (`low blood sugar` ~ `Hypoglycaemia`). RRF fuses the
 two ranks without depending on incompatible score scales. Index: pgvector
-IVFFlat in PostgreSQL (not FAISS).
+IVFFlat in PostgreSQL.
 
 ### Why a cross-encoder in Stage 2?
 The bi-encoder from Stage 1 compares pre-computed vectors; the
@@ -114,7 +114,7 @@ production path.
 | DB schema / migrations | Yes |
 | Reduced demo dataset (no license needed) | Not yet -- planned as a separate follow-up, not part of this snapshot |
 | Full MedDRA / MAUDE pipeline end-to-end | Only with your own licensed MedDRA files (`raw_data/` is gitignored, not included) |
-| Hetzner production server | Offline -- deliberately paused, not reactivated for this portfolio snapshot |
+| Hetzner production server (EU-only) | Offline -- deliberately paused, not reactivated for this portfolio snapshot |
 
 ## Demo artifacts
 
