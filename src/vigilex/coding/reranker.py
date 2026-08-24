@@ -89,6 +89,12 @@ class CrossEncoderReranker:
 
     Bi-encoder vs CrossEncoder -- the key distinction:
         Bi-encoder (PubMedBERT in hybrid_search.py):
+            # CORRECTION (2026-08): the bi-encoder in hybrid_search.py is
+            # all-mpnet-base-v2, not PubMedBERT -- switched after the 2026-05-26
+            # benchmark (see hybrid_search.py MODEL_NAME / EmbeddingModel, and
+            # Notebooks 05/06). The point being made below (bi-encoder = encode
+            # separately, fast, less accurate) still holds regardless of which
+            # bi-encoder model is used -- only the model name is out of date.
             Encodes the query separately: embed(query)
             Encodes each candidate separately: embed(PT_name)
             Score = cosine_similarity(embed(query), embed(PT_name))

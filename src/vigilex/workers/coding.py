@@ -36,6 +36,11 @@ The confidence formula:
 
 Worker design:
     - Models are loaded ONCE at startup (PubMedBERT + CrossEncoder = several seconds)
+      # CORRECTION (2026-08): the embedding model loaded here is all-mpnet-base-v2,
+      # not PubMedBERT -- see load_pipeline() below, which logs "Loading
+      # all-mpnet-base-v2 embedding model...". Switched after the 2026-05-26
+      # benchmark (scripts/bench_embedding_models.py). CrossEncoder (MiniLM-L-6)
+      # is still correct as written.
     - A fresh DB connection is opened per batch (self-healing against SSH tunnel restarts)
     - Each report is processed independently: one failure does not abort the batch
     - A polling loop checks for uncoded reports every 60s when the queue is empty
@@ -302,6 +307,11 @@ def code_report(
 
     Stage 1 -- Hybrid Search:
         Takes the narrative text, encodes the first sentence with PubMedBERT,
+        # CORRECTION (2026-08): encoding uses all-mpnet-base-v2, not PubMedBERT
+        # (see hybrid_search.py MODEL_NAME). Also, as of the query-fusion change,
+        # Stage 1 actually encodes TWO query variants (first sentence + first 512
+        # chars of the full text) and merges both candidate sets -- see
+        # HybridSearcher.search() in hybrid_search.py for the current behaviour.
         runs BM25 and vector search in parallel, fuses with RRF -> Top-20 candidates.
 
     Stage 2 -- CrossEncoder Reranking:

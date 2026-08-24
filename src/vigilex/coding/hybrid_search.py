@@ -154,6 +154,13 @@ class HybridSearcher:
             +--> Vector arm (pgvector) --> top-100 candidates by cosine similarity
                     |
                     v (encode with PubMedBERT first)
+                    # CORRECTION (2026-08): this diagram line is stale. Query encoding
+                    # uses all-mpnet-base-v2 (see MODEL_NAME / EmbeddingModel below),
+                    # not PubMedBERT -- switched after the 2026-05-26 benchmark showed
+                    # all-mpnet-base-v2 clearly outperforms PubMedBERT for MedDRA PT
+                    # retrieval (R@5 = 0.25 vs. 0.0, scripts/bench_embedding_models.py).
+                    # Left the original line above so the history is visible; do not
+                    # copy "PubMedBERT" from it into new code.
             |
             +--> RRF fusion --> top-K results by combined rank
 

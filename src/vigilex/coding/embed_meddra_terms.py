@@ -1,6 +1,19 @@
 """
 embed_meddra_terms.py -- Generate PubMedBERT embeddings for all MedDRA PT names.
 
+# CORRECTION / STATUS NOTE (2026-08): this script is LEGACY and is no longer run.
+# A benchmark on 2026-05-26 (scripts/bench_embedding_models.py) showed
+# all-mpnet-base-v2 clearly outperforms PubMedBERT for MedDRA PT retrieval
+# (R@5 = 0.25 vs. 0.0 with pt_only pooling on the production index). Production
+# switched to scripts/embed_meddra_terms_v2.py, which writes 768-dim
+# all-mpnet-base-v2 vectors into processed.meddra_terms.embedding_mpnet
+# (migrations/004_embedding_mpnet.sql). hybrid_search.py and workers/coding.py
+# both use that column, not pt_embedding below. This file is kept for reference
+# (and because pt_embedding still exists as a column) but nothing in the current
+# pipeline calls it. The explanation below is accurate for what THIS script does --
+# it is just not what the running system does anymore. See Notebook 05 for the
+# full history.
+
 What is an embedding?
     An embedding is a list of numbers (a vector) that represents the meaning of
     a piece of text in a mathematical space. Texts with similar meanings have
