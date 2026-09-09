@@ -6,6 +6,9 @@
 > documents the backend architecture, the coding pipeline, and the evaluation
 > results of a working system.
 
+Documentation: https://carpetcrawler78.github.io/sentinelai-docs/
+Frontend repository: https://github.com/carpetcrawler78/sentinelai
+
 ---
 
 ## Why this project exists
