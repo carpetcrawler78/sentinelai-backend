@@ -22,3 +22,25 @@ coding_*.log
 *.log
 *.log
 _internal_dev/
+
+# Local AI assistant / agent files (not published)
+CLAUDE.md
+AGENTS.md
+.claude/
+.cursor/
+**/CC_PROMPT_*.md
+*settings.local.json
+.agents/
+.lovable/
+
+# Removed from the repository, kept locally
+/alt/
+06_prompts/
+PROJECT_MEMORY.md
+status-chatgpt.md
+EXECUTION_PLAN.md
+git_push.bat
+hetzner_autopull.sh
+CLAUDE*.md
+CLAUDE_CODE_PROMPT_*
+**/CC_PROMPT_*
