@@ -9,6 +9,9 @@
 Documentation: https://carpetcrawler78.github.io/sentinelai-docs/
 Frontend repository: https://github.com/carpetcrawler78/sentinelai
 
+`vigilex` is the internal codename of the project; it is used for the Python
+package, the database and the Docker container names.
+
 ---
 
 ## Why this project exists
@@ -132,22 +135,23 @@ not yet part of this repository -- open item, to be added later.
 ## Local setup
 
 ```bash
-# Clone and install
 git clone https://github.com/carpetcrawler78/sentinelai-backend.git
 cd sentinelai-backend
 python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-# Configure
+# Test dependencies (same package list as CI, CPU-only torch)
+pip install -r requirements-test.txt
+
+# Run tests (the package lives in src/, there is no installable package)
+PYTHONPATH=src pytest tests/     # Windows PowerShell: $env:PYTHONPATH="src"; pytest tests/
+
+# Configure (only needed for the workers and the API, not for the tests)
 cp .env.example .env
 # Edit .env with your DATABASE_URL, OLLAMA_BASE_URL, API_KEY
 
 # Optional: openFDA API key (raises rate limit from 1k to 120k req/day)
 # Free at https://open.fda.gov/apis/authentication/
-
-# Run tests
-pytest
 ```
 
 The full stack (Postgres + pgvector, Ollama, ingest worker, coding worker,
@@ -197,11 +201,10 @@ and MLflow run names are in `DEVLOG.md` and `EVAL_PLAN.md`.
 
 ## Author
 
-Built by Thomas Heger -- Dr. sc. ETH Biochemistry, former Clinical Data
-Manager at DKFZ Heidelberg (REQUITE, RADprecise post-market surveillance
-studies). Domain expertise in GCP documentation, MDR conformity, and EU
-regulatory context informs both the architecture choices and the
-evaluation framing of this project.
+Built by Thomas Heger – Dr. sc. ETH (Biochemistry), five years of clinical
+data management at DKFZ Heidelberg (GCP documentation, data validation,
+query management). That background shaped the human-in-the-loop design and
+the audit trail of this project.
 
 ## License
 

@@ -8,8 +8,8 @@ Tests all three stages with a single narrative:
 
 Prerequisites:
   - SSH tunnels open:
-      ssh -L 5432:localhost:5432 cap@<server>
-      ssh -L 11434:localhost:11434 cap@<server>
+      ssh -L 5432:localhost:5432 <user>@<server>
+      ssh -L 11434:localhost:11434 <user>@<server>
   - .env file in vigilex root with POSTGRES_* credentials
   - pip install sentence-transformers psycopg2-binary python-dotenv torch transformers
 
@@ -84,7 +84,7 @@ def test_db(verbose):
         print(f"  {PASS}  Connected in {ms:.0f}ms")
     except Exception as e:
         print(f"  {FAIL}  {e}")
-        print("  Hint: is the SSH tunnel open?  ssh -L 5432:localhost:5432 cap@<server>")
+        print("  Hint: is the SSH tunnel open?  ssh -L 5432:localhost:5432 <user>@<server>")
         sys.exit(1)
 
     with conn.cursor() as cur:
@@ -202,7 +202,7 @@ def test_llm(reranked, verbose):
         ms = (time.time() - t0) * 1000
     except Exception as e:
         print(f"  {FAIL}  LLM call failed: {e}")
-        print("  Hint: is the SSH tunnel open?  ssh -L 11434:localhost:11434 cap@<server>")
+        print("  Hint: is the SSH tunnel open?  ssh -L 11434:localhost:11434 <user>@<server>")
         sys.exit(1)
 
     check("Result has pt_code", isinstance(result.pt_code, int), f"pt_code={result.pt_code}")

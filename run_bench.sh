@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/cap/vigilex
+cd "$(dirname "$0")"
 set -a && source .env && set +a
 export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}"
 export PYTHONPATH=src

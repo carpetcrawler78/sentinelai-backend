@@ -1,0 +1,19 @@
+# Minimal dependencies to run the test suite (pytest tests/).
+# Used by CI (.github/workflows/ci.yml) and the local setup in README.md.
+# CPU-only torch wheels come from the PyTorch index.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+pytest
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+httpx==0.28.1
+pydantic==2.9.2
+pydantic-settings==2.5.2
+python-dotenv==1.0.1
+psycopg2-binary==2.9.9
+pgvector==0.3.5
+torch
+sentence-transformers==3.2.1
+numpy==1.26.4
+python-json-logger==2.0.7
+requests==2.32.5

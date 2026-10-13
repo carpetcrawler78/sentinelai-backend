@@ -1,7 +1,7 @@
 -- Migration 005: add reviewer decision columns to processed.coding_results
 -- Run on Hetzner:
 --   docker exec vigilex-postgres psql -U vigilex -d vigilex \
---     -f /home/cap/vigilex/migrations/005_reviewer_columns.sql
+--     -f <repo-dir>/migrations/005_reviewer_columns.sql
 
 ALTER TABLE processed.coding_results
     ADD COLUMN IF NOT EXISTS reviewer_action  TEXT,

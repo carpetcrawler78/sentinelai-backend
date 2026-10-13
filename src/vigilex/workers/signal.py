@@ -13,7 +13,7 @@ Usage (from vigilex repo root, with SSH tunnel to Hetzner open):
     python -m vigilex.workers.signal --once --dry-run  # smoke test (no DB write)
 
 Required SSH tunnel for local development:
-    ssh -L 5432:localhost:5432 cap@<server>
+    ssh -L 5432:localhost:5432 <user>@<server>
 """
 
 import argparse

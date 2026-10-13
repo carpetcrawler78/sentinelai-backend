@@ -11,7 +11,7 @@ Laeuft als FastAPI-Service im bestehenden Docker Compose Stack auf Hetzner.
 
 ```bash
 # Auf dem Hetzner-Server:
-ssh cap@<server>
+ssh <user>@<server>
 cd ~/vigilex
 
 # Starken Key generieren und in .env eintragen:
@@ -53,7 +53,7 @@ SSH-Tunnel oeffnen und im Browser aufrufen:
 
 ```bash
 # Lokal (Windows):
-ssh -L 8000:localhost:8000 cap@<server>
+ssh -L 8000:localhost:8000 <user>@<server>
 ```
 
 Dann: [http://localhost:8000/docs](http://localhost:8000/docs)
@@ -254,7 +254,7 @@ SSH-Tunnel zu Hetzner + lokaler uvicorn:
 
 ```bash
 # 1. Tunnel oeffnen (eigenes Terminal):
-ssh -L 5432:localhost:5432 cap@<server>
+ssh -L 5432:localhost:5432 <user>@<server>
 
 # 2. Umgebungsvariablen setzen:
 export DATABASE_URL=postgresql://vigilex:<pw>@localhost:5432/vigilex

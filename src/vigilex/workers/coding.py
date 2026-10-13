@@ -53,7 +53,7 @@ Usage (from vigilex repo root, with SSH tunnels open):
     python -m vigilex.workers.coding --skip-llm --once     # Stage 1+2 only (no Ollama)
 
 Required SSH tunnels for local development:
-    ssh -L 5432:localhost:5432 -L 11434:localhost:11434 cap@<server>
+    ssh -L 5432:localhost:5432 -L 11434:localhost:11434 <user>@<server>
 """
 
 import argparse
